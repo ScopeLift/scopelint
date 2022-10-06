@@ -4,7 +4,7 @@
   license = "MIT"
   name = "scopelint"
   repository = "https://github.com/ScopeLift/scopelint"
-  version = "0.1.0"
+  version = "0.0.1"
 
 [dependencies]
   taplo = "0.11.0"
