@@ -1,9 +1,10 @@
 [package]
-name = "scopelint"
-version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+  description = "An opinionated formatting and linting tool for foundry projects"
+  edition = "2021"
+  license = "MIT"
+  name = "scopelint"
+  repository = "https://github.com/ScopeLift/scopelint"
+  version = "0.1.0"
 
 [dependencies]
-taplo = "0.11.0"
+  taplo = "0.11.0"
