@@ -37,12 +37,13 @@ impl Config {
 }
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
-    // Configure formatting options, overwriting only a few of the defaults.
-    // https://taplo.tamasfe.dev/.
-    let mut taplo_opts = taplo::formatter::Options::default();
-    taplo_opts.allowed_blank_lines = 1;
-    taplo_opts.indent_entries = true;
-    taplo_opts.reorder_keys = true;
+    // Configure formatting options, https://taplo.tamasfe.dev/.
+    let taplo_opts = taplo::formatter::Options {
+        allowed_blank_lines: 1,
+        indent_entries: true,
+        reorder_keys: true,
+        ..Default::default()
+    };
 
     // Execute commands.
     match config.mode {
@@ -86,10 +87,6 @@ fn check(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
         eprintln!("Error: Formatting failed, run `scopelint fmt` to fix");
     }
 
-    if valid_test_names.is_err() {
-        eprintln!("Error: Invalid test names, see details above");
-    }
-
     if forge_ok && taplo_ok && valid_test_names.is_ok() {
         Ok(())
     } else {
@@ -99,13 +96,14 @@ fn check(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
 
 fn validate_test_names() -> Result<(), Box<dyn Error>> {
     let pattern = r"\sfunction\stest\w{1,}\(";
-    let ok_src = search(pattern, &"./src").expect("src search failed");
-    let ok_script = search(pattern, &"./script").expect("script search failed");
-    let ok_test = search(pattern, &"./test").expect("test search failed");
+    let ok_src = search(pattern, "./src").expect("src search failed");
+    let ok_script = search(pattern, "./script").expect("script search failed");
+    let ok_test = search(pattern, "./test").expect("test search failed");
 
     if ok_src && ok_script && ok_test {
         Ok(())
     } else {
+        eprintln!("Error: Invalid test names, see details above");
         Err("Invalid test names".into())
     }
 }
@@ -119,7 +117,7 @@ fn search(pattern: &str, path: &str) -> Result<bool, Box<dyn Error>> {
     }
 
     let mut success = true; // Default to true.
-    let test_matcher = RegexMatcher::new_line_matcher(&pattern)?;
+    let test_matcher = RegexMatcher::new_line_matcher(pattern)?;
 
     let mut searcher = SearcherBuilder::new()
         .binary_detection(BinaryDetection::quit(b'\x00'))
@@ -176,7 +174,7 @@ fn search(pattern: &str, path: &str) -> Result<bool, Box<dyn Error>> {
                 line = test.line,
                 // Start at index 9 to remove "function ", and end at -1 to
                 // remove the closing parenthesis.
-                text = trimmed_test[9..trimmed_test.len() - 1].to_string()
+                text = &trimmed_test[9..trimmed_test.len() - 1]
             );
         }
     }
