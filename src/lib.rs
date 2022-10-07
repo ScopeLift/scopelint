@@ -6,13 +6,15 @@ use grep::{
 use std::{error::Error, fs, process};
 use walkdir::WalkDir;
 
-// For now our config is very simple and this enum/struct is arguably overkill,
-// but doing this to simplify future changes if we allow more granularity.
+// Using this enum and struct to simplify future changes if we allow more
+// granularity, though this is probably overkill, especially since we'd likely
+// use clap if input arguments get more complex.
 enum Mode {
     Format,
     Check,
 }
 
+/// Program configuration. Valid modes are `fmt` and `check`.
 pub struct Config {
     mode: Mode,
 }
@@ -36,6 +38,7 @@ impl Config {
     }
 }
 
+/// Takes the provided `config` and runs the program.
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     // Configure formatting options, https://taplo.tamasfe.dev/.
     let taplo_opts = taplo::formatter::Options {

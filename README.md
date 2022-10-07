@@ -11,7 +11,7 @@ Formatting and checking does the following:
 
 - Runs `forge fmt` to format Solidity.
 - Uses the `taplo` crate to format TOML.
-- Coming soon: Checks the naming conventions of forge tests.
+- Checks the naming conventions of forge tests.
 - Coming soon: Validates function names and visibility in forge scripts.
 
 ## Usage
