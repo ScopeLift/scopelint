@@ -3,6 +3,7 @@ use grep::{
     regex::RegexMatcher,
     searcher::{sinks::UTF8, BinaryDetection, SearcherBuilder},
 };
+use regex::Regex;
 use std::{error::Error, fs, process};
 use walkdir::WalkDir;
 
@@ -68,7 +69,7 @@ fn fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     fs::write("./foundry.toml", config_fmt)?;
 
     // Check test names.
-    validate_test_names()
+    validate_names()
 }
 
 fn check(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
@@ -82,43 +83,49 @@ fn check(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     let config_fmt = taplo::formatter::format(&config_orig, taplo_opts);
     let taplo_ok = config_orig == config_fmt;
 
-    // Check test names.
-    let valid_test_names = validate_test_names();
+    // Check naming conventions.
+    let valid_names = validate_names();
 
     // Log results and exit.
     if !forge_ok || !taplo_ok {
         eprintln!("Error: Formatting failed, run `scopelint fmt` to fix");
     }
 
-    if forge_ok && taplo_ok && valid_test_names.is_ok() {
+    if forge_ok && taplo_ok && valid_names.is_ok() {
         Ok(())
     } else {
         Err("One or more checks failed, review above output".into())
     }
 }
 
-fn validate_test_names() -> Result<(), Box<dyn Error>> {
-    let pattern = r"\sfunction\stest\w{1,}\(";
-    let ok_src = search(pattern, "./src").expect("src search failed");
-    let ok_script = search(pattern, "./script").expect("script search failed");
-    let ok_test = search(pattern, "./test").expect("test search failed");
+fn validate_names() -> Result<(), Box<dyn Error>> {
+    let paths = ["./src", "./script", "./test"];
 
-    if ok_src && ok_script && ok_test {
+    let pattern = r"\sfunction\stest\w{1,}\(";
+    let test_names_ok = search_test_names(pattern, paths)?;
+
+    let pattern = r"\sconstant\s";
+    let constant_names_ok = search_constant_names(pattern, paths)?;
+
+    if test_names_ok && constant_names_ok {
         Ok(())
     } else {
-        eprintln!("Error: Invalid test names, see details above");
-        Err("Invalid test names".into())
+        eprintln!("Error: Invalid names found, see details above");
+        Err("Invalid names found".into())
     }
 }
 
-// Reference: https://github.com/BurntSushi/ripgrep/blob/master/crates/grep/examples/simplegrep.rs
-fn search(pattern: &str, path: &str) -> Result<bool, Box<dyn Error>> {
-    struct Match {
-        file: String, // File name.
-        line: u64,    // Line number.
-        text: String, // Test name.
-    }
+struct Match {
+    file: String, // File name.
+    line: u64,    // Line number.
+    text: String, // Incorrectly named item.
+}
 
+// Reference: https://github.com/BurntSushi/ripgrep/blob/master/crates/grep/examples/simplegrep.rs
+fn search_test_names(
+    pattern: &str,
+    paths: [&str; 3],
+) -> Result<bool, Box<dyn Error>> {
     let mut success = true; // Default to true.
     let test_matcher = RegexMatcher::new_line_matcher(pattern)?;
 
@@ -127,58 +134,136 @@ fn search(pattern: &str, path: &str) -> Result<bool, Box<dyn Error>> {
         .line_number(true)
         .build();
 
-    for result in WalkDir::new(path) {
-        let dent = match result {
-            Ok(dent) => dent,
-            Err(err) => {
-                eprintln!("{err}");
+    for path in paths {
+        for result in WalkDir::new(path) {
+            let dent = match result {
+                Ok(dent) => dent,
+                Err(err) => {
+                    eprintln!("{err}");
+                    continue
+                }
+            };
+
+            if !dent.file_type().is_file() {
                 continue
             }
-        };
 
-        if !dent.file_type().is_file() {
-            continue
+            let mut misnamed_tests: Vec<Match> = vec![];
+            searcher.search_path(
+                &test_matcher,
+                dent.path(),
+                UTF8(|lnum, line| {
+                    // We are guaranteed to find a match, so the unwrap is ok.
+                    let test_match =
+                        test_matcher.find(line.as_bytes())?.unwrap();
+                    let test_name = line[test_match].to_string();
+
+                    // Found a test, check if it matches our pattern.
+                    let test_validator = RegexMatcher::new_line_matcher(
+                        r"test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w{1,}\(",
+                    )
+                    .expect("Could not create regex matcher");
+
+                    // If match is found, test name is good, otherwise it's bad.
+                    let test_result = test_validator.find(test_name.as_bytes());
+                    if test_result?.is_none() {
+                        misnamed_tests.push(Match {
+                            file: dent.path().to_str().unwrap().to_string(),
+                            line: lnum,
+                            text: test_name,
+                        });
+                    }
+                    Ok(true)
+                }),
+            )?;
+
+            success = misnamed_tests.is_empty();
+            for test in misnamed_tests {
+                let trimmed_test = test.text.trim();
+                eprintln!(
+                    "Misnamed test found in {file} on line {line}: {text}",
+                    file = test.file,
+                    line = test.line,
+                    // Start at index 9 to remove "function ", and end at -1 to
+                    // remove the closing parenthesis.
+                    text = &trimmed_test[9..trimmed_test.len() - 1]
+                );
+            }
         }
+    }
 
-        let mut misnamed_tests: Vec<Match> = vec![];
-        searcher.search_path(
-            &test_matcher,
-            dent.path(),
-            UTF8(|lnum, line| {
-                // We are guaranteed to find a match, so the unwrap is ok.
-                let test_match = test_matcher.find(line.as_bytes())?.unwrap();
-                let test_name = line[test_match].to_string();
+    Ok(success)
+}
 
-                // Now that we found a test, we check if it matches our pattern.
-                let test_validator = RegexMatcher::new_line_matcher(
-                    r"test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w{1,}\(",
-                )
-                .expect("Could not create regex matcher");
+fn search_constant_names(
+    pattern: &str,
+    paths: [&str; 3],
+) -> Result<bool, Box<dyn Error>> {
+    let mut success = true; // Default to true.
+    let test_matcher = RegexMatcher::new_line_matcher(pattern)?;
 
-                // If match is found, test name is good, otherwise it's bad.
-                let test_result = test_validator.find(test_name.as_bytes());
-                if test_result?.is_none() {
-                    misnamed_tests.push(Match {
-                        file: dent.path().to_str().unwrap().to_string(),
-                        line: lnum,
-                        text: test_name,
-                    });
+    let mut searcher = SearcherBuilder::new()
+        .binary_detection(BinaryDetection::quit(b'\x00'))
+        .line_number(true)
+        .build();
+
+    for path in paths {
+        for result in WalkDir::new(path) {
+            let dent = match result {
+                Ok(dent) => dent,
+                Err(err) => {
+                    eprintln!("{err}");
+                    continue
                 }
-                Ok(true)
-            }),
-        )?;
+            };
 
-        success = misnamed_tests.is_empty();
-        for test in misnamed_tests {
-            let trimmed_test = test.text.trim();
-            eprintln!(
-                "Misnamed test found in {file} on line {line}: {text}",
-                file = test.file,
-                line = test.line,
-                // Start at index 9 to remove "function ", and end at -1 to
-                // remove the closing parenthesis.
-                text = &trimmed_test[9..trimmed_test.len() - 1]
-            );
+            if !dent.file_type().is_file() {
+                continue
+            }
+
+            let mut misnamed_vars: Vec<Match> = vec![];
+            searcher.search_path(
+                &test_matcher,
+                dent.path(),
+                UTF8(|lnum, line| {
+                    // Found a constant/immutable, get the var name.
+                    let r = Regex::new(r"(;|=)").unwrap();
+                    let mut split_str = r.split(line);
+                    let var = split_str
+                        .next()
+                        .expect("no match")
+                        .split_whitespace()
+                        .last()
+                        .expect("no match");
+
+                    // Make sure it's ALL_CAPS: https://regex101.com/r/Pv9mD8/1
+                    let name_validator = RegexMatcher::new_line_matcher(
+                        r"^[A-Z]+(?:_{0,1}[A-Z]+)*$",
+                    )
+                    .expect("Could not create regex matcher");
+
+                    // If match is found, test name is good, otherwise it's bad.
+                    let test_result = name_validator.find(var.as_bytes());
+                    if test_result?.is_none() {
+                        misnamed_vars.push(Match {
+                            file: dent.path().to_str().unwrap().to_string(),
+                            line: lnum,
+                            text: var.to_string(),
+                        });
+                    }
+                    Ok(true)
+                }),
+            )?;
+
+            success = misnamed_vars.is_empty();
+            for var in misnamed_vars {
+                eprintln!(
+                    "Misnamed constant or immutable found in {file} on line {line}: {text}",
+                    file = var.file,
+                    line = var.line,
+                    text = var.text
+                );
+            }
         }
     }
 
