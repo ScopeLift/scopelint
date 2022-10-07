@@ -7,4 +7,6 @@
   version = "0.0.1"
 
 [dependencies]
+  grep = "0.2.10"
   taplo = "0.11.0"
+  walkdir = "2.3.2"
