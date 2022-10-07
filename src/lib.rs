@@ -1,9 +1,9 @@
-use grep::matcher::Matcher;
-use grep::regex::RegexMatcher;
-use grep::searcher::sinks::UTF8;
-use grep::searcher::{BinaryDetection, SearcherBuilder};
-use std::error::Error;
-use std::{fs, process};
+use grep::{
+    matcher::Matcher,
+    regex::RegexMatcher,
+    searcher::{sinks::UTF8, BinaryDetection, SearcherBuilder},
+};
+use std::{error::Error, fs, process};
 use walkdir::WalkDir;
 
 // For now our config is very simple and this enum/struct is arguably overkill,
@@ -20,7 +20,7 @@ pub struct Config {
 impl Config {
     pub fn build(args: &[String]) -> Result<Config, &'static str> {
         if args.len() > 2 {
-            return Err("Too many arguments");
+            return Err("Too many arguments")
         }
 
         let mode = match args.len() {
@@ -69,10 +69,8 @@ fn fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
 
 fn check(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     // Check Solidity with `forge fmt`
-    let forge_status = process::Command::new("forge")
-        .arg("fmt")
-        .arg("--check")
-        .output()?;
+    let forge_status =
+        process::Command::new("forge").arg("fmt").arg("--check").output()?;
     let forge_ok = forge_status.status.success();
 
     // Check TOML with `taplo fmt`
@@ -133,12 +131,12 @@ fn search(pattern: &str, path: &str) -> Result<bool, Box<dyn Error>> {
             Ok(dent) => dent,
             Err(err) => {
                 eprintln!("{err}");
-                continue;
+                continue
             }
         };
 
         if !dent.file_type().is_file() {
-            continue;
+            continue
         }
 
         let mut misnamed_tests: Vec<Match> = vec![];
@@ -176,7 +174,8 @@ fn search(pattern: &str, path: &str) -> Result<bool, Box<dyn Error>> {
                 "Misnamed test found in {file} on line {line}: {text}",
                 file = test.file,
                 line = test.line,
-                // Start at index 9 to remove "function ", and end at -1 to remove the closing parenthesis.
+                // Start at index 9 to remove "function ", and end at -1 to
+                // remove the closing parenthesis.
                 text = trimmed_test[9..trimmed_test.len() - 1].to_string()
             );
         }

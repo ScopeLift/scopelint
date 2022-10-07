@@ -1,0 +1,10 @@
+binop_separator = "Back"
+comment_width = 80
+imports_granularity = "Crate"
+max_width = 80
+reorder_imports = true
+trailing_comma = "Vertical"
+trailing_semicolon = false
+use_field_init_shorthand = true
+use_small_heuristics = "Max"
+wrap_comments = true
