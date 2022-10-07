@@ -68,7 +68,7 @@ fn fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     let config_fmt = taplo::formatter::format(&config_orig, taplo_opts);
     fs::write("./foundry.toml", config_fmt)?;
 
-    // Check test names.
+    // Check naming conventions.
     validate_names()
 }
 
