@@ -66,10 +66,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
 
 fn fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     // Format Solidity with forge
-    process::Command::new("forge")
-        .arg("fmt")
-        .output()
-        .expect("forge fmt failed");
+    process::Command::new("forge").arg("fmt").output().expect("forge fmt failed");
 
     // Format `foundry.toml` with taplo.
     let config_orig = fs::read_to_string("./foundry.toml")?;
@@ -95,12 +92,9 @@ fn check(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
 // ======== Validations ========
 // =============================
 
-fn validate_fmt(
-    taplo_opts: taplo::formatter::Options,
-) -> Result<(), Box<dyn Error>> {
+fn validate_fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     // Check Solidity with `forge fmt`
-    let forge_status =
-        process::Command::new("forge").arg("fmt").arg("--check").output()?;
+    let forge_status = process::Command::new("forge").arg("fmt").arg("--check").output()?;
     let forge_ok = forge_status.status.success();
 
     // Check TOML with `taplo fmt`
@@ -145,10 +139,7 @@ impl InvalidItem {
             Validator::Test => "Invalid test name",
             Validator::Constant => "Invalid constant or immutable name",
         };
-        format!(
-            "{} in {} on line {}: {}\n",
-            prefix, self.file, self.line, self.text
-        )
+        format!("{} in {} on line {}: {}\n", prefix, self.file, self.line, self.text)
     }
 }
 
@@ -171,10 +162,7 @@ impl fmt::Display for ValidationResults {
 
 impl ValidationResults {
     fn new() -> ValidationResults {
-        ValidationResults {
-            invalid_tests: Vec::new(),
-            invalid_constants: Vec::new(),
-        }
+        ValidationResults { invalid_tests: Vec::new(), invalid_constants: Vec::new() }
     }
 
     fn is_valid(&self) -> bool {
@@ -183,8 +171,7 @@ impl ValidationResults {
 }
 
 fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
-    let test_matcher =
-        RegexMatcher::new_line_matcher(r"\sfunction\stest\w{1,}\(")?;
+    let test_matcher = RegexMatcher::new_line_matcher(r"\sfunction\stest\w{1,}\(")?;
     let constant_matcher = RegexMatcher::new_line_matcher(r"\sconstant\s")?;
 
     let mut searcher = SearcherBuilder::new()
@@ -211,9 +198,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                 &test_matcher,
                 dent.path(),
                 UTF8(|lnum, line| {
-                    if let Some(i) =
-                        check_test(&test_matcher, &dent, lnum, line)
-                    {
+                    if let Some(i) = check_test(&test_matcher, &dent, lnum, line) {
                         results.invalid_tests.push(i);
                     }
                     Ok(true)
@@ -247,10 +232,9 @@ fn check_test(
     let text = line[the_match].to_string();
 
     // Found a test, check if it matches our pattern.
-    let validator = RegexMatcher::new_line_matcher(
-        r"test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w{1,}\(",
-    )
-    .expect(r"new_line_matcher regex can't have \n");
+    let validator =
+        RegexMatcher::new_line_matcher(r"test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w{1,}\(")
+            .expect(r"new_line_matcher regex can't have \n");
 
     // If match is found, test name is good, otherwise it's bad.
     let match_result = validator.find(text.as_bytes()).unwrap();
@@ -269,25 +253,15 @@ fn check_test(
     Some(item)
 }
 
-fn check_constant(
-    dent: &walkdir::DirEntry,
-    lnum: u64,
-    line: &str,
-) -> Option<InvalidItem> {
+fn check_constant(dent: &walkdir::DirEntry, lnum: u64, line: &str) -> Option<InvalidItem> {
     // Found a constant/immutable, get the var name.
     let r = Regex::new(r"(;|=)").unwrap();
     let mut split_str = r.split(line);
-    let var = split_str
-        .next()
-        .expect("no match 1")
-        .split_whitespace()
-        .last()
-        .expect("no match 2");
+    let var = split_str.next().expect("no match 1").split_whitespace().last().expect("no match 2");
 
     // Make sure it's ALL_CAPS: https://regex101.com/r/Pv9mD8/1
-    let name_validator =
-        RegexMatcher::new_line_matcher(r"^[A-Z]+(?:_{0,1}[A-Z]+)*$")
-            .expect(r"new_line_matcher regex can't have \n");
+    let name_validator = RegexMatcher::new_line_matcher(r"^[A-Z]+(?:_{0,1}[A-Z]+)*$")
+        .expect(r"new_line_matcher regex can't have \n");
 
     // If match is found, test name is good, otherwise it's bad.
     let match_result = name_validator.find(var.as_bytes()).unwrap();
