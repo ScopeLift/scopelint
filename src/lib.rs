@@ -180,6 +180,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
         .build();
 
     let mut results = ValidationResults::new();
+
     for path in paths {
         for result in WalkDir::new(path) {
             let dent = match result {
@@ -217,7 +218,6 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
             )?;
         }
     }
-
     Ok(results)
 }
 
@@ -232,9 +232,8 @@ fn check_test(
     let text = line[the_match].to_string();
 
     // Found a test, check if it matches our pattern.
-    let validator =
-        RegexMatcher::new_line_matcher(r"test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w{1,}\(")
-            .expect(r"new_line_matcher regex can't have \n");
+    let pattern = r"test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w{1,}\(";
+    let validator = RegexMatcher::new_line_matcher(pattern).unwrap();
 
     // If match is found, test name is good, otherwise it's bad.
     let match_result = validator.find(text.as_bytes()).unwrap();
@@ -247,6 +246,7 @@ fn check_test(
         kind: Validator::Test,
         file: dent.path().to_str().unwrap().to_string(),
         line: lnum,
+        // Trim off the leading "function " and remove the trailing "(".
         text: trimmed_test[9..trimmed_test.len() - 1].to_string(),
     };
 
@@ -260,8 +260,7 @@ fn check_constant(dent: &walkdir::DirEntry, lnum: u64, line: &str) -> Option<Inv
     let var = split_str.next().expect("no match 1").split_whitespace().last().expect("no match 2");
 
     // Make sure it's ALL_CAPS: https://regex101.com/r/Pv9mD8/1
-    let name_validator = RegexMatcher::new_line_matcher(r"^[A-Z]+(?:_{0,1}[A-Z]+)*$")
-        .expect(r"new_line_matcher regex can't have \n");
+    let name_validator = RegexMatcher::new_line_matcher(r"^[A-Z]+(?:_{0,1}[A-Z]+)*$").unwrap();
 
     // If match is found, test name is good, otherwise it's bad.
     let match_result = name_validator.find(var.as_bytes()).unwrap();
