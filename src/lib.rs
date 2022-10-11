@@ -122,8 +122,9 @@ fn validate_names() -> Result<(), Box<dyn Error>> {
 }
 
 enum Validator {
-    Test,
     Constant,
+    Script,
+    Test,
 }
 
 struct InvalidItem {
@@ -135,17 +136,25 @@ struct InvalidItem {
 
 impl InvalidItem {
     fn description(&self) -> String {
-        let prefix = match self.kind {
-            Validator::Test => "Invalid test name",
-            Validator::Constant => "Invalid constant or immutable name",
-        };
-        format!("{} in {} on line {}: {}\n", prefix, self.file, self.line, self.text)
+        match self.kind {
+            Validator::Test => {
+                format!("Invalid test name in {} on line {}: {}\n", self.file, self.line, self.text)
+            }
+            Validator::Constant => {
+                format!(
+                    "Invalid constant or immutable name in {} on line {}: {}\n",
+                    self.file, self.line, self.text
+                )
+            }
+            Validator::Script => format!("Invalid script interface in {}\n", self.file),
+        }
     }
 }
 
 struct ValidationResults {
     invalid_tests: Vec<InvalidItem>,
     invalid_constants: Vec<InvalidItem>,
+    invalid_scripts: Vec<InvalidItem>,
 }
 
 impl fmt::Display for ValidationResults {
@@ -156,17 +165,26 @@ impl fmt::Display for ValidationResults {
         for item in &self.invalid_constants {
             write!(f, "{}", item.description())?;
         }
+        for item in &self.invalid_scripts {
+            write!(f, "{}", item.description())?;
+        }
         Ok(())
     }
 }
 
 impl ValidationResults {
     fn new() -> ValidationResults {
-        ValidationResults { invalid_tests: Vec::new(), invalid_constants: Vec::new() }
+        ValidationResults {
+            invalid_tests: Vec::new(),
+            invalid_constants: Vec::new(),
+            invalid_scripts: Vec::new(),
+        }
     }
 
     fn is_valid(&self) -> bool {
-        self.invalid_tests.is_empty() && self.invalid_constants.is_empty()
+        self.invalid_tests.is_empty() &&
+            self.invalid_constants.is_empty() &&
+            self.invalid_scripts.is_empty()
     }
 }
 
@@ -195,6 +213,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                 continue
             }
 
+            // Validate test naming convention.
             searcher.search_path(
                 &test_matcher,
                 dent.path(),
@@ -206,6 +225,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                 }),
             )?;
 
+            // Validate constant/immutable naming convention.
             searcher.search_path(
                 &constant_matcher,
                 dent.path(),
@@ -216,6 +236,13 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                     Ok(true)
                 }),
             )?;
+
+            // Validate scripts only have a single run method.
+            if path == "./script" {
+                if let Some(i) = check_script(dent)? {
+                    results.invalid_scripts.push(i);
+                }
+            }
         }
     }
     Ok(results)
@@ -275,4 +302,37 @@ fn check_constant(dent: &walkdir::DirEntry, lnum: u64, line: &str) -> Option<Inv
         text: var.to_string(),
     };
     Some(item)
+}
+
+fn check_script(dent: walkdir::DirEntry) -> Result<Option<InvalidItem>, Box<dyn Error>> {
+    let mut fns_found = 0;
+    let mut found_run_fn = false;
+
+    let text = fs::read_to_string(dent.path())?;
+    let fn_regex = Regex::new(r"function \w*\([\w\s,]*\)[\w\s]*\{").unwrap();
+    let setup_regex = Regex::new(r"function setUp\(").unwrap();
+    let public_regex = Regex::new(r"\b(public|external)\b").unwrap();
+    let run_regex = Regex::new(r"\brun\b").unwrap();
+
+    for cap in fn_regex.captures_iter(&text) {
+        let text = &cap[0];
+        if !setup_regex.is_match(text) && public_regex.is_match(text) {
+            fns_found += 1;
+            found_run_fn = found_run_fn || run_regex.is_match(text);
+        }
+    }
+
+    if fns_found == 1 && found_run_fn {
+        Ok(None)
+    } else {
+        // We only return 1 item to summarize the file.
+        // TODO Script checks don't really fit nicely into InvalidItem, refactor needed to log more
+        // details about the invalid script's ABI.
+        Ok(Some(InvalidItem {
+            kind: Validator::Script,
+            file: dent.path().to_str().unwrap().to_string(),
+            line: u64::MAX,       // We don't have the line number.
+            text: "".to_string(), // We don't return the text for now.
+        }))
+    }
 }
