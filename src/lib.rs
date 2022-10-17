@@ -203,7 +203,7 @@ impl ValidationResults {
 fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
     // Test and constant matchers are a single line, so we use `new_line_matcher`, but function
     // signatures may be multi-line, so we use `new`.
-    let test_matcher = RegexMatcher::new_line_matcher(r"\sfunction[\s]*test\w+\(")?;
+    let test_matcher = RegexMatcher::new_line_matcher(r"function\s*test\w+\(")?;
     let constant_matcher = RegexMatcher::new_line_matcher(r"\sconstant\s")?;
     let fn_matcher = RegexMatcher::new(r"function\s+\w+\([\w\s,]*\)[\w\s]*\{")?;
 
@@ -375,8 +375,8 @@ fn check_script(dent: walkdir::DirEntry) -> Result<Option<InvalidItem>, Box<dyn 
     let mut found_run_fn = false;
 
     let text = fs::read_to_string(dent.path())?;
-    let fn_regex = Regex::new(r"function[\s]*\w*\([\w\s,]*\)[\w\s]*\{").unwrap();
-    let setup_regex = Regex::new(r"function[\s]*setUp\(").unwrap();
+    let fn_regex = Regex::new(r"function\s*\w*\([\w\s,]*\)[\w\s]*\{").unwrap();
+    let setup_regex = Regex::new(r"function\s*setUp\(").unwrap();
     let public_regex = Regex::new(r"\b(public|external)\b").unwrap();
     let run_regex = Regex::new(r"\brun\b").unwrap();
 
