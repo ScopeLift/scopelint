@@ -4,7 +4,7 @@
   license = "MIT"
   name = "scopelint"
   repository = "https://github.com/ScopeLift/scopelint"
-  version = "0.0.5"
+  version = "0.0.6"
 
 [dependencies]
   grep = "0.2.10"
