@@ -124,6 +124,7 @@ fn validate_names() -> Result<(), Box<dyn Error>> {
 enum Validator {
     Constant,
     Script,
+    Src,
     Test,
 }
 
@@ -147,6 +148,12 @@ impl InvalidItem {
                 )
             }
             Validator::Script => format!("Invalid script interface in {}\n", self.file),
+            Validator::Src => {
+                format!(
+                    "Invalid src method name in {} on line {}: {}\n",
+                    self.file, self.line, self.text
+                )
+            }
         }
     }
 }
@@ -155,6 +162,7 @@ struct ValidationResults {
     invalid_tests: Vec<InvalidItem>,
     invalid_constants: Vec<InvalidItem>,
     invalid_scripts: Vec<InvalidItem>,
+    invalid_src: Vec<InvalidItem>,
 }
 
 impl fmt::Display for ValidationResults {
@@ -168,6 +176,9 @@ impl fmt::Display for ValidationResults {
         for item in &self.invalid_scripts {
             write!(f, "{}", item.description())?;
         }
+        for item in &self.invalid_src {
+            write!(f, "{}", item.description())?;
+        }
         Ok(())
     }
 }
@@ -178,6 +189,7 @@ impl ValidationResults {
             invalid_tests: Vec::new(),
             invalid_constants: Vec::new(),
             invalid_scripts: Vec::new(),
+            invalid_src: Vec::new(),
         }
     }
 
@@ -189,12 +201,21 @@ impl ValidationResults {
 }
 
 fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
-    let test_matcher = RegexMatcher::new_line_matcher(r"\sfunction\stest\w{1,}\(")?;
+    // Test and constant matchers are a single line, so we use `new_line_matcher`, but function
+    // signatures may be multi-line, so we use `new`.
+    let test_matcher = RegexMatcher::new_line_matcher(r"\sfunction[\s]*test\w+\(")?;
     let constant_matcher = RegexMatcher::new_line_matcher(r"\sconstant\s")?;
+    let fn_matcher = RegexMatcher::new(r"function\s+\w+\([\w\s,]*\)[\w\s]*\{")?;
 
     let mut searcher = SearcherBuilder::new()
         .binary_detection(BinaryDetection::quit(b'\x00'))
         .line_number(true)
+        .build();
+
+    let mut multiline_searcher = SearcherBuilder::new()
+        .binary_detection(BinaryDetection::quit(b'\x00'))
+        .line_number(true)
+        .multi_line(true)
         .build();
 
     let mut results = ValidationResults::new();
@@ -237,6 +258,20 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                 }),
             )?;
 
+            // Validate src contract function names have leading underscores if internal/private.
+            if path == "./src" {
+                multiline_searcher.search_path(
+                    &fn_matcher,
+                    dent.path(),
+                    UTF8(|lnum, line| {
+                        if let Some(item) = check_src_fn(&fn_matcher, &dent, lnum, line) {
+                            results.invalid_src.push(item);
+                        }
+                        Ok(true)
+                    }),
+                )?;
+            }
+
             // Validate scripts only have a single run method.
             if path == "./script" {
                 if let Some(i) = check_script(dent)? {
@@ -258,8 +293,8 @@ fn check_test(
     let the_match = matcher.find(line.as_bytes()).unwrap().unwrap();
     let text = line[the_match].to_string();
 
-    // Found a test, check if it matches our pattern.
-    let pattern = r"test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w{1,}\(";
+    // Check if it matches our pattern.
+    let pattern = r"test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w+\(";
     let validator = RegexMatcher::new_line_matcher(pattern).unwrap();
 
     // If match is found, test name is good, otherwise it's bad.
@@ -277,6 +312,37 @@ fn check_test(
         text: trimmed_test[9..trimmed_test.len() - 1].to_string(),
     };
 
+    Some(item)
+}
+
+fn check_src_fn(
+    matcher: &RegexMatcher,
+    dent: &walkdir::DirEntry,
+    lnum: u64,
+    line: &str,
+) -> Option<InvalidItem> {
+    // We are guaranteed to find a match, so the unwrap is ok.
+    let the_match = matcher.find(line.as_bytes()).unwrap().unwrap();
+    let text = line[the_match].to_string();
+
+    // Ensure public/external functions have no leading underscore, and internal/private functions
+    // have a leading underscore.
+    let vis_validator = RegexMatcher::new_line_matcher(r"\b(public|external)\b").unwrap();
+    let is_public = vis_validator.find(text.as_bytes()).unwrap();
+    let name = text[9..text.len() - 1].to_string();
+    let first_char = name.trim().chars().next()?;
+
+    if is_public.is_some() && first_char != '_' || is_public.is_none() && first_char == '_' {
+        return None
+    }
+
+    let item = InvalidItem {
+        kind: Validator::Src,
+        file: dent.path().to_str().unwrap().to_string(),
+        line: lnum,
+        // Trim off the leading "function " and remove the trailing "(".
+        text: name,
+    };
     Some(item)
 }
 
@@ -309,8 +375,8 @@ fn check_script(dent: walkdir::DirEntry) -> Result<Option<InvalidItem>, Box<dyn 
     let mut found_run_fn = false;
 
     let text = fs::read_to_string(dent.path())?;
-    let fn_regex = Regex::new(r"function \w*\([\w\s,]*\)[\w\s]*\{").unwrap();
-    let setup_regex = Regex::new(r"function setUp\(").unwrap();
+    let fn_regex = Regex::new(r"function[\s]*\w*\([\w\s,]*\)[\w\s]*\{").unwrap();
+    let setup_regex = Regex::new(r"function[\s]*setUp\(").unwrap();
     let public_regex = Regex::new(r"\b(public|external)\b").unwrap();
     let run_regex = Regex::new(r"\brun\b").unwrap();
 
