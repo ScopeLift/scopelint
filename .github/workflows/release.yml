@@ -146,7 +146,7 @@ jobs:
               if [[ $platform =~ "windows" ]]; then
                   exe=".exe"
               fi
-              pkgname=$PROJECT_NAME-$TAG-$platform
+              pkgname=$PROJECT_NAME-$platform
               mkdir tmp/$pkgname
               # cp LICENSE README.md tmp/$pkgname
               mv bins-$platform/$BIN_NAME$exe tmp/$pkgname
