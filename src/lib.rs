@@ -18,6 +18,7 @@ use walkdir::WalkDir;
 enum Mode {
     Format,
     Check,
+    Version,
 }
 
 /// Program configuration. Valid modes are `fmt` and `check`.
@@ -37,6 +38,7 @@ impl Config {
             2 => match args[1].as_str() {
                 "fmt" => Mode::Format,
                 "check" => Mode::Check,
+                "version" => Mode::Version,
                 _ => panic!("Invalid argument {}", &args[1]),
             },
             _ => panic!("Too many arguments"),
@@ -63,7 +65,13 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     match config.mode {
         Mode::Format => fmt(taplo_opts),
         Mode::Check => check(taplo_opts),
+        Mode::Version => version(),
     }
+}
+
+fn version() -> Result<(), Box<dyn Error>> {
+    println!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+    Ok(())
 }
 
 fn fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
