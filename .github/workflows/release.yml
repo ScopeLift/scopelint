@@ -183,6 +183,6 @@ jobs:
           profile: minimal
           toolchain: nightly
           target: ${{ matrix.target }}
-      - run: cargo publish --token ${CRATES_TOKEN}
+      - run: cargo publish --token ${CRATES_TOKEN} --allow-dirty
         env:
           CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
