@@ -1,5 +1,6 @@
 name: Release
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
@@ -16,31 +17,33 @@ jobs:
     strategy:
       fail-fast: false # don't fail other jobs if one fails
       matrix:
-        job:
-          # The OS is used for the runner
-          # The platform is a generic platform name
-          # The target is used by Cargo
-          # The arch is either 386, arm64 or amd64
-          - os: ubuntu-latest
-            platform: linux
+        build: [x86_64-linux, aarch64-linux, x86_64-macos, x86_64-windows, aarch64-macos]
+        include:
+          - build: x86_64-linux
+            os: ubuntu-20.04
+            rust: nightly
             target: x86_64-unknown-linux-gnu
-            arch: amd64
-          - os: ubuntu-latest
-            platform: linux
+            cross: false
+          - build: aarch64-linux
+            os: ubuntu-20.04
+            rust: nightly
             target: aarch64-unknown-linux-gnu
-            arch: arm64
-          - os: macos-latest
-            platform: darwin
+            cross: true
+          - build: x86_64-macos
+            os: macos-latest
+            rust: nightly
             target: x86_64-apple-darwin
-            arch: amd64
-          - os: macos-latest
-            platform: darwin
-            target: aarch64-apple-darwin
-            arch: arm64
-          - os: windows-latest
-            platform: win32
+            cross: false
+          - build: x86_64-windows
+            os: windows-2019
+            rust: nightly
             target: x86_64-pc-windows-msvc
-            arch: amd64
+            cross: false
+          - build: aarch64-macos
+            os: macos-latest
+            rust: nightly
+            target: aarch64-apple-darwin
+            cross: false
 
     steps:
       - name: Checkout sources
@@ -48,25 +51,29 @@ jobs:
         with:
           submodules: true
 
-      - name: Install nightly toolchain
+      - name: Install ${{ matrix.rust }} toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: ${{ matrix.rust }}
           target: ${{ matrix.target }}
           override: true
 
+      # We skip tests for M1 (arm64), because the binary is for M1 but the github runner is Intel,
+      # so it can't run the binary/tests. However, the Intel macOS can build the binaries for M1
+      # which is what happens here.
       - name: Run cargo test
         uses: actions-rs/cargo@v1
+        if: ${{ matrix.build != 'aarch64-macos' }}
         with:
-          use-cross: false
+          use-cross: ${{ matrix.cross }}
           command: test
           args: --release --locked --target ${{ matrix.target }}
 
       - name: Build release binary
         uses: actions-rs/cargo@v1
         with:
-          use-cross: false
+          use-cross: ${{ matrix.cross }}
           command: build
           args: --release --locked --target ${{ matrix.target }}
 
