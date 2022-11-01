@@ -1,3 +1,4 @@
+//! An opinionated formatting and linting tool for foundry projects.
 use grep::{
     matcher::Matcher,
     regex::RegexMatcher,
@@ -25,6 +26,7 @@ pub struct Config {
 }
 
 impl Config {
+    /// Create a new configuration from the command line arguments.
     pub fn build(args: &[String]) -> Result<Config, &'static str> {
         if args.len() > 2 {
             return Err("Too many arguments")
