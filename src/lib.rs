@@ -367,7 +367,7 @@ fn check_constant(dent: &walkdir::DirEntry, lnum: u64, line: &str) -> Option<Inv
     let var = split_str.next().expect("no match 1").split_whitespace().last().expect("no match 2");
 
     // Make sure it's ALL_CAPS: https://regex101.com/r/Pv9mD8/1
-    let name_validator = RegexMatcher::new_line_matcher(r"^[A-Z]+(?:_{0,1}[A-Z]+)*$").unwrap();
+    let name_validator = RegexMatcher::new_line_matcher(r"^_?[A-Z]+(?:_{0,1}[A-Z]+)*$").unwrap();
 
     // If match is found, test name is good, otherwise it's bad.
     let match_result = name_validator.find(var.as_bytes()).unwrap();
