@@ -1,3 +1,6 @@
+#![doc = include_str!("../README.md")]
+#![warn(missing_docs, unreachable_pub, unused, rust_2021_compatibility)]
+#![warn(clippy::all, clippy::pedantic, clippy::cargo, clippy::nursery)]
 use std::{env, process};
 
 fn main() {
@@ -8,7 +11,7 @@ fn main() {
         process::exit(1);
     });
 
-    if let Err(err) = scopelint::run(config) {
+    if let Err(err) = scopelint::run(&config) {
         eprintln!("\nExecution failed: {err}");
         process::exit(1);
     }

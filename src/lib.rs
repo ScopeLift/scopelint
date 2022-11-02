@@ -1,4 +1,7 @@
-//! An opinionated formatting and linting tool for foundry projects.
+#![doc = include_str!("../README.md")]
+#![warn(missing_docs, unreachable_pub, unused, rust_2021_compatibility)]
+#![warn(clippy::all, clippy::pedantic, clippy::cargo, clippy::nursery)]
+
 use grep::{
     matcher::Matcher,
     regex::RegexMatcher,
@@ -28,22 +31,19 @@ pub struct Config {
 
 impl Config {
     /// Create a new configuration from the command line arguments.
-    pub fn build(args: &[String]) -> Result<Config, &'static str> {
-        if args.len() > 2 {
-            return Err("Too many arguments")
-        }
-
-        let mode = match args.len() {
-            1 => Mode::Format, // Default to format if no args provided.
+    /// # Errors
+    /// Errors if too many arguments are provided, or an invalid mode is provided.
+    pub fn build(args: &[String]) -> Result<Self, &'static str> {
+        match args.len() {
+            1 => Ok(Self { mode: Mode::Format }), // Default to format if no args provided.
             2 => match args[1].as_str() {
-                "fmt" => Mode::Format,
-                "check" => Mode::Check,
-                "version" => Mode::Version,
-                _ => panic!("Invalid argument {}", &args[1]),
+                "fmt" => Ok(Self { mode: Mode::Format }),
+                "check" => Ok(Self { mode: Mode::Check }),
+                "version" => Ok(Self { mode: Mode::Version }),
+                _ => Err("Unrecognized mode"),
             },
-            _ => panic!("Too many arguments"),
-        };
-        Ok(Config { mode })
+            _ => Err("Too many arguments"),
+        }
     }
 }
 
@@ -52,7 +52,9 @@ impl Config {
 // ===========================
 
 /// Takes the provided `config` and runs the program.
-pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
+/// # Errors
+/// Errors if the provided mode fails to run.
+pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
     // Configure formatting options, https://taplo.tamasfe.dev/.
     let taplo_opts = taplo::formatter::Options {
         allowed_blank_lines: 1,
@@ -65,13 +67,15 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     match config.mode {
         Mode::Format => fmt(taplo_opts),
         Mode::Check => check(taplo_opts),
-        Mode::Version => version(),
+        Mode::Version => {
+            version();
+            Ok(())
+        }
     }
 }
 
-fn version() -> Result<(), Box<dyn Error>> {
+fn version() {
     println!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
-    Ok(())
 }
 
 fn fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
@@ -194,8 +198,8 @@ impl fmt::Display for ValidationResults {
 }
 
 impl ValidationResults {
-    fn new() -> ValidationResults {
-        ValidationResults {
+    const fn new() -> Self {
+        Self {
             invalid_tests: Vec::new(),
             invalid_constants: Vec::new(),
             invalid_scripts: Vec::new(),
@@ -284,7 +288,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
 
             // Validate scripts only have a single run method.
             if path == "./script" {
-                if let Some(i) = check_script(dent)? {
+                if let Some(i) = check_script(&dent)? {
                     results.invalid_scripts.push(i);
                 }
             }
@@ -380,7 +384,7 @@ fn check_constant(dent: &walkdir::DirEntry, lnum: u64, line: &str) -> Option<Inv
     Some(item)
 }
 
-fn check_script(dent: walkdir::DirEntry) -> Result<Option<InvalidItem>, Box<dyn Error>> {
+fn check_script(dent: &walkdir::DirEntry) -> Result<Option<InvalidItem>, Box<dyn Error>> {
     let mut fns_found = 0;
     let mut found_run_fn = false;
 
@@ -407,8 +411,8 @@ fn check_script(dent: walkdir::DirEntry) -> Result<Option<InvalidItem>, Box<dyn 
         Ok(Some(InvalidItem {
             kind: Validator::Script,
             file: dent.path().to_str().unwrap().to_string(),
-            line: u64::MAX,       // We don't have the line number.
-            text: "".to_string(), // We don't return the text for now.
+            line: u64::MAX,      // We don't have the line number.
+            text: String::new(), // We don't return the text for now.
         }))
     }
 }

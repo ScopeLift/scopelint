@@ -1,10 +1,12 @@
 [package]
+  categories = ["development-tools", "development-tools::linters"]
   description = "An opinionated formatting and linting tool for foundry projects"
   edition = "2021"
+  keywords = ["foundry", "linting", "formatting"]
   license = "MIT"
   name = "scopelint"
   repository = "https://github.com/ScopeLift/scopelint"
-  version = "0.0.8"
+  version = "0.0.9"
 
 [dependencies]
   grep = "0.2.10"
