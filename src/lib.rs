@@ -40,7 +40,7 @@ impl Config {
             2 => match args[1].as_str() {
                 "fmt" => Ok(Self { mode: Mode::Format }),
                 "check" => Ok(Self { mode: Mode::Check }),
-                "version" => Ok(Self { mode: Mode::Version }),
+                "--version" | "-v" => Ok(Self { mode: Mode::Version }),
                 _ => Err("Unrecognized mode"),
             },
             _ => Err("Too many arguments"),
@@ -84,9 +84,8 @@ fn fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     let forge_status = process::Command::new("forge").arg("fmt").output()?;
 
     // Print any warnings/errors from `forge fmt`.
-    let stderr = String::from_utf8(forge_status.stderr)?;
-    if !stderr.is_empty() {
-        print!("{stderr}");
+    if !forge_status.stderr.is_empty() {
+        print!("{}", String::from_utf8(forge_status.stderr)?);
     }
 
     // Format `foundry.toml` with taplo.
@@ -120,7 +119,7 @@ fn validate_fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Err
     // Print any warnings/errors from `forge fmt`.
     let stderr = String::from_utf8(forge_status.stderr)?;
     let forge_ok = forge_status.status.success() && stderr.is_empty();
-    print!("{stderr}");
+    print!("{stderr}"); // Prints nothing if stderr is empty.
 
     // Check TOML with `taplo fmt`
     let config_orig = fs::read_to_string("./foundry.toml")?;

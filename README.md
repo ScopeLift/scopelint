@@ -20,6 +20,7 @@ Formatting and checking does the following:
 - Install with `cargo install scopelint`.
 - Format code with `scopelint fmt`.
 - Validate formatting with `scopelint check`.
+- Print the version with `scopelint --version`.
 - Use the ScopeLift [foundry template](https://github.com/ScopeLift/foundry-template/) to automatically run scopelint and slither in CI.
 
 ## Limitations
