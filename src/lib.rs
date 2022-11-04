@@ -80,7 +80,13 @@ fn version() {
 
 fn fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     // Format Solidity with forge
-    process::Command::new("forge").arg("fmt").output().expect("forge fmt failed");
+    let forge_status = process::Command::new("forge").arg("fmt").output()?;
+
+    // Print any warnings/errors from `forge fmt`.
+    let stderr = String::from_utf8(forge_status.stderr)?;
+    if !stderr.is_empty() {
+        println!("{stderr}");
+    }
 
     // Format `foundry.toml` with taplo.
     let config_orig = fs::read_to_string("./foundry.toml")?;
@@ -109,7 +115,11 @@ fn check(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
 fn validate_fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     // Check Solidity with `forge fmt`
     let forge_status = process::Command::new("forge").arg("fmt").arg("--check").output()?;
-    let forge_ok = forge_status.status.success();
+
+    // Print any warnings/errors from `forge fmt`.
+    let stderr = String::from_utf8(forge_status.stderr)?;
+    let forge_ok = forge_status.status.success() && stderr.is_empty();
+    println!("{stderr}");
 
     // Check TOML with `taplo fmt`
     let config_orig = fs::read_to_string("./foundry.toml")?;
@@ -117,7 +127,7 @@ fn validate_fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Err
     let taplo_ok = config_orig == config_fmt;
 
     if !forge_ok || !taplo_ok {
-        eprintln!("Error: Formatting failed, run `scopelint fmt` to fix");
+        eprintln!("Error: Formatting validation failed, run `scopelint fmt` to fix");
         return Err("Invalid fmt found".into())
     }
     Ok(())
