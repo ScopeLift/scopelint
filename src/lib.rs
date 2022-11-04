@@ -40,7 +40,7 @@ impl Config {
                 "fmt" => Ok(Self { mode: Mode::Format }),
                 "check" => Ok(Self { mode: Mode::Check }),
                 "version" => Ok(Self { mode: Mode::Version }),
-                _ => Err("Unrecognized mode"),
+                _ => Err("Unrecognized mode: Must be 'fmt', 'check', or '--version'"),
             },
             _ => Err("Too many arguments"),
         }
