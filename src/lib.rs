@@ -2,6 +2,7 @@
 #![warn(missing_docs, unreachable_pub, unused, rust_2021_compatibility)]
 #![warn(clippy::all, clippy::pedantic, clippy::cargo, clippy::nursery)]
 
+use colored::Colorize;
 use grep::{
     matcher::Matcher,
     regex::RegexMatcher,
@@ -39,8 +40,8 @@ impl Config {
             2 => match args[1].as_str() {
                 "fmt" => Ok(Self { mode: Mode::Format }),
                 "check" => Ok(Self { mode: Mode::Check }),
-                "version" => Ok(Self { mode: Mode::Version }),
-                _ => Err("Unrecognized mode"),
+                "--version" | "-v" => Ok(Self { mode: Mode::Version }),
+                _ => Err("Unrecognized mode: Must be 'fmt', 'check', or '--version'"),
             },
             _ => Err("Too many arguments"),
         }
@@ -80,7 +81,12 @@ fn version() {
 
 fn fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     // Format Solidity with forge
-    process::Command::new("forge").arg("fmt").output().expect("forge fmt failed");
+    let forge_status = process::Command::new("forge").arg("fmt").output()?;
+
+    // Print any warnings/errors from `forge fmt`.
+    if !forge_status.stderr.is_empty() {
+        print!("{}", String::from_utf8(forge_status.stderr)?);
+    }
 
     // Format `foundry.toml` with taplo.
     let config_orig = fs::read_to_string("./foundry.toml")?;
@@ -109,7 +115,11 @@ fn check(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
 fn validate_fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     // Check Solidity with `forge fmt`
     let forge_status = process::Command::new("forge").arg("fmt").arg("--check").output()?;
-    let forge_ok = forge_status.status.success();
+
+    // Print any warnings/errors from `forge fmt`.
+    let stderr = String::from_utf8(forge_status.stderr)?;
+    let forge_ok = forge_status.status.success() && stderr.is_empty();
+    print!("{stderr}"); // Prints nothing if stderr is empty.
 
     // Check TOML with `taplo fmt`
     let config_orig = fs::read_to_string("./foundry.toml")?;
@@ -117,7 +127,10 @@ fn validate_fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Err
     let taplo_ok = config_orig == config_fmt;
 
     if !forge_ok || !taplo_ok {
-        eprintln!("Error: Formatting failed, run `scopelint fmt` to fix");
+        eprintln!(
+            "{}: Formatting validation failed, run `scopelint fmt` to fix",
+            "error".bold().red()
+        );
         return Err("Invalid fmt found".into())
     }
     Ok(())
@@ -128,8 +141,8 @@ fn validate_names() -> Result<(), Box<dyn Error>> {
     let results = validate(paths)?;
 
     if !results.is_valid() {
-        eprintln!("{results}");
-        eprintln!("Error: Naming conventions failed, see details above");
+        eprint!("{results}");
+        eprintln!("{}: Naming conventions failed, see details above", "error".bold().red());
         return Err("Invalid names found".into())
     }
     Ok(())
@@ -153,18 +166,18 @@ impl InvalidItem {
     fn description(&self) -> String {
         match self.kind {
             Validator::Test => {
-                format!("Invalid test name in {} on line {}: {}\n", self.file, self.line, self.text)
+                format!("Invalid test name in {} on line {}: {}", self.file, self.line, self.text)
             }
             Validator::Constant => {
                 format!(
-                    "Invalid constant or immutable name in {} on line {}: {}\n",
+                    "Invalid constant or immutable name in {} on line {}: {}",
                     self.file, self.line, self.text
                 )
             }
-            Validator::Script => format!("Invalid script interface in {}\n", self.file),
+            Validator::Script => format!("Invalid script interface in {}", self.file),
             Validator::Src => {
                 format!(
-                    "Invalid src method name in {} on line {}: {}\n",
+                    "Invalid src method name in {} on line {}: {}",
                     self.file, self.line, self.text
                 )
             }
@@ -182,16 +195,16 @@ struct ValidationResults {
 impl fmt::Display for ValidationResults {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         for item in &self.invalid_tests {
-            write!(f, "{}", item.description())?;
+            writeln!(f, "{}", item.description())?;
         }
         for item in &self.invalid_constants {
-            write!(f, "{}", item.description())?;
+            writeln!(f, "{}", item.description())?;
         }
         for item in &self.invalid_scripts {
-            write!(f, "{}", item.description())?;
+            writeln!(f, "{}", item.description())?;
         }
         for item in &self.invalid_src {
-            write!(f, "{}", item.description())?;
+            writeln!(f, "{}", item.description())?;
         }
         Ok(())
     }
