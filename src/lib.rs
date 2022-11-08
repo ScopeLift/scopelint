@@ -1,7 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![warn(missing_docs, unreachable_pub, unused, rust_2021_compatibility)]
 #![warn(clippy::all, clippy::pedantic, clippy::cargo, clippy::nursery)]
-#![feature(option_result_contains)]
 
 use colored::Colorize;
 use grep::{
@@ -261,7 +260,9 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
             if !dent.file_type().is_file() {
                 continue
             }
-            if !dent.path().to_str().contains(&".sol") {
+            if !dent.file_type().is_file() ||
+                !dent.path().to_str().expect("Expected string for a filename").ends_with(&".sol")
+            {
                 continue
             }
 
