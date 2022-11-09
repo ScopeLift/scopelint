@@ -9,7 +9,7 @@ use grep::{
     searcher::{sinks::UTF8, BinaryDetection, SearcherBuilder},
 };
 use regex::Regex;
-use std::{error::Error, fmt, fs, process};
+use std::{error::Error, ffi::OsStr, fmt, fs, process};
 use walkdir::WalkDir;
 
 // ========================
@@ -257,7 +257,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                 }
             };
 
-            if !dent.file_type().is_file() {
+            if !dent.file_type().is_file() || dent.path().extension() != Some(OsStr::new("sol")) {
                 continue
             }
 
