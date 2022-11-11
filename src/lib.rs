@@ -5,10 +5,11 @@
 use colored::Colorize;
 use regex::Regex;
 use solang_parser::pt::{
-    ContractPart, FunctionAttribute, SourceUnitPart, VariableAttribute, Visibility,
+    ContractPart, FunctionAttribute, FunctionDefinition, SourceUnitPart, VariableAttribute,
+    VariableDefinition, Visibility,
 };
 use std::{error::Error, ffi::OsStr, fmt, fs, process};
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
 
 // ========================
 // ======== Config ========
@@ -199,12 +200,69 @@ impl ValidationResults {
     }
 }
 
+trait Validate {
+    fn validate(&self, dent: &DirEntry) -> Vec<InvalidItem>;
+}
+
+impl Validate for VariableDefinition {
+    fn validate(&self, dent: &DirEntry) -> Vec<InvalidItem> {
+        let mut invalid_items = Vec::new();
+        let name = &self.name.name;
+
+        // Validate constants and immutables.
+        let is_constant = self
+            .attrs
+            .iter()
+            .any(|a| matches!(a, VariableAttribute::Constant(_) | VariableAttribute::Immutable(_)));
+        if is_constant && !is_valid_constant_name(name) {
+            invalid_items.push(InvalidItem {
+                kind: Validator::Constant,
+                file: dent.path().display().to_string(),
+                text: name.clone(),
+            });
+        }
+        invalid_items
+    }
+}
+
+impl Validate for FunctionDefinition {
+    fn validate(&self, dent: &DirEntry) -> Vec<InvalidItem> {
+        let mut invalid_items = Vec::new();
+        let name = &self.name.as_ref().unwrap().name;
+
+        // Validate test names.
+        if dent.path().starts_with("./test") && !is_valid_test_name(name) {
+            invalid_items.push(InvalidItem {
+                kind: Validator::Test,
+                file: dent.path().display().to_string(),
+                text: name.clone(),
+            });
+        }
+
+        // Validate src method names.
+        let is_private = self.attributes.iter().any(|a| match a {
+            FunctionAttribute::Visibility(v) => {
+                matches!(v, Visibility::Private(_) | Visibility::Internal(_))
+            }
+            _ => false,
+        });
+
+        if dent.path().starts_with("./src") && is_private && !is_valid_src_name(name) {
+            invalid_items.push(InvalidItem {
+                kind: Validator::Src,
+                file: dent.path().display().to_string(),
+                text: name.clone(),
+            });
+        }
+
+        invalid_items
+    }
+}
+
 fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
     let mut results = ValidationResults::new();
 
     for path in paths {
-        let is_test = path == "./test";
-        let is_src = path == "./src";
         let is_script = path == "./script";
 
         for result in WalkDir::new(path) {
@@ -230,36 +288,20 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
             // Run checks.
             for element in pt.0 {
                 match element {
+                    SourceUnitPart::FunctionDefinition(f) => {
+                        results.invalid_items.extend(f.validate(&dent));
+                    }
+                    SourceUnitPart::VariableDefinition(v) => {
+                        results.invalid_items.extend(v.validate(&dent));
+                    }
                     SourceUnitPart::ContractDefinition(c) => {
                         for el in c.parts {
                             match el {
                                 ContractPart::VariableDefinition(v) => {
-                                    let name = v.name.name;
-                                    let is_constant = v.attrs.iter().any(|a| {
-                                        matches!(
-                                            a,
-                                            VariableAttribute::Constant(_) |
-                                                VariableAttribute::Immutable(_)
-                                        )
-                                    });
-                                    if is_constant && !is_valid_constant_name(&name) {
-                                        results.invalid_items.push(InvalidItem {
-                                            kind: Validator::Constant,
-                                            file: dent.path().display().to_string(),
-                                            text: name,
-                                        });
-                                    }
+                                    results.invalid_items.extend(v.validate(&dent));
                                 }
                                 ContractPart::FunctionDefinition(f) => {
-                                    // Validate test function naming convention.
-                                    let name = f.name.unwrap().name;
-                                    if is_test && !is_valid_test_name(&name) {
-                                        results.invalid_items.push(InvalidItem {
-                                            kind: Validator::Test,
-                                            file: dent.path().display().to_string(),
-                                            text: name.clone(),
-                                        });
-                                    }
+                                    results.invalid_items.extend(f.validate(&dent));
 
                                     let is_private = f.attributes.iter().any(|a| match a {
                                         FunctionAttribute::Visibility(v) => {
@@ -271,16 +313,9 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                                         _ => false,
                                     });
 
+                                    let name = f.name.unwrap().name;
                                     if is_script && !is_private && name != "setUp" {
                                         num_public_script_methods += 1;
-                                    }
-
-                                    if is_src && is_private && !is_valid_src_name(&name) {
-                                        results.invalid_items.push(InvalidItem {
-                                            kind: Validator::Src,
-                                            file: dent.path().display().to_string(),
-                                            text: name,
-                                        });
                                     }
                                 }
                                 ContractPart::StructDefinition(_) |
@@ -299,8 +334,6 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                     SourceUnitPart::StructDefinition(_) |
                     SourceUnitPart::EventDefinition(_) |
                     SourceUnitPart::ErrorDefinition(_) |
-                    SourceUnitPart::FunctionDefinition(_) |
-                    SourceUnitPart::VariableDefinition(_) |
                     SourceUnitPart::TypeDefinition(_) |
                     SourceUnitPart::Using(_) |
                     SourceUnitPart::StraySemicolon(_) => (),
