@@ -15,16 +15,13 @@ use walkdir::{DirEntry, WalkDir};
 // ======== Config ========
 // ========================
 
-// Using this enum and struct to simplify future changes if we allow more
-// granularity, though this is probably overkill, especially since we'd likely
-// use clap if input arguments get more complex.
 enum Mode {
     Format,
     Check,
     Version,
 }
 
-/// Program configuration. Valid modes are `fmt` and `check`.
+/// Program configuration. Valid modes are `fmt`, `check`, and `--version`.
 pub struct Config {
     mode: Mode,
 }
@@ -74,10 +71,12 @@ pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
     }
 }
 
+// Print the package version.
 fn version() {
     println!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 }
 
+// Format the code, and print details on any invalid items.
 fn fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     // Format Solidity with forge
     let forge_status = process::Command::new("forge").arg("fmt").output()?;
@@ -93,11 +92,12 @@ fn fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     fs::write("./foundry.toml", config_fmt)?;
 
     // Check naming conventions.
-    validate_names()
+    validate_conventions()
 }
 
+// Validate the code formatting, and print details on any invalid items.
 fn check(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
-    let valid_names = validate_names();
+    let valid_names = validate_conventions();
     let valid_fmt = validate_fmt(taplo_opts);
 
     if valid_names.is_ok() && valid_fmt.is_ok() {
@@ -110,6 +110,8 @@ fn check(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
 // =============================
 // ======== Validations ========
 // =============================
+
+// -------- Top level validation methods --------
 
 fn validate_fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     // Check Solidity with `forge fmt`
@@ -135,17 +137,19 @@ fn validate_fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Err
     Ok(())
 }
 
-fn validate_names() -> Result<(), Box<dyn Error>> {
+fn validate_conventions() -> Result<(), Box<dyn Error>> {
     let paths = ["./src", "./script", "./test"];
     let results = validate(paths)?;
 
     if !results.is_valid() {
         eprint!("{results}");
-        eprintln!("{}: Naming conventions failed, see details above", "error".bold().red());
+        eprintln!("{}: Convention checks failed, see details above", "error".bold().red());
         return Err("Invalid names found".into())
     }
     Ok(())
 }
+
+// -------- Validation implementation --------
 
 enum Validator {
     Constant,
@@ -155,6 +159,7 @@ enum Validator {
 }
 
 struct InvalidItem {
+    // TODO Map solang `File` info to line number.
     kind: Validator,
     file: String, // File name.
     text: String, // Incorrectly named item.
@@ -209,7 +214,7 @@ impl Validate for VariableDefinition {
         let mut invalid_items = Vec::new();
         let name = &self.name.name;
 
-        // Validate constants and immutables.
+        // Validate constants and immutables are in ALL_CAPS.
         let is_constant = self
             .attrs
             .iter()
@@ -221,6 +226,7 @@ impl Validate for VariableDefinition {
                 text: name.clone(),
             });
         }
+
         invalid_items
     }
 }
@@ -230,7 +236,7 @@ impl Validate for FunctionDefinition {
         let mut invalid_items = Vec::new();
         let name = &self.name.as_ref().unwrap().name;
 
-        // Validate test names.
+        // Validate test names match the required pattern.
         if dent.path().starts_with("./test") && !is_valid_test_name(name) {
             invalid_items.push(InvalidItem {
                 kind: Validator::Test,
@@ -239,7 +245,7 @@ impl Validate for FunctionDefinition {
             });
         }
 
-        // Validate src method names.
+        // Validate internal and private src methods start with an underscore.
         let is_private = self.attributes.iter().any(|a| match a {
             FunctionAttribute::Visibility(v) => {
                 matches!(v, Visibility::Private(_) | Visibility::Internal(_))
@@ -247,7 +253,7 @@ impl Validate for FunctionDefinition {
             _ => false,
         });
 
-        if dent.path().starts_with("./src") && is_private && !is_valid_src_name(name) {
+        if dent.path().starts_with("./src") && is_private && !name.starts_with('_') {
             invalid_items.push(InvalidItem {
                 kind: Validator::Src,
                 file: dent.path().display().to_string(),
@@ -259,6 +265,7 @@ impl Validate for FunctionDefinition {
     }
 }
 
+// Core validation method that walks the filesystem and validates all Solidity files.
 fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
     let mut results = ValidationResults::new();
 
@@ -303,6 +310,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                                 ContractPart::FunctionDefinition(f) => {
                                     results.invalid_items.extend(f.validate(&dent));
 
+                                    let name = f.name.unwrap().name;
                                     let is_private = f.attributes.iter().any(|a| match a {
                                         FunctionAttribute::Visibility(v) => {
                                             matches!(
@@ -312,8 +320,6 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                                         }
                                         _ => false,
                                     });
-
-                                    let name = f.name.unwrap().name;
                                     if is_script && !is_private && name != "setUp" {
                                         num_public_script_methods += 1;
                                     }
@@ -361,10 +367,6 @@ fn is_valid_test_name(name: &str) -> bool {
     }
     let regex = Regex::new(r"test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w+").unwrap();
     regex.is_match(name)
-}
-
-fn is_valid_src_name(name: &str) -> bool {
-    name.starts_with('_')
 }
 
 fn is_valid_constant_name(name: &str) -> bool {
