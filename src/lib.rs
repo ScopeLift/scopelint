@@ -177,24 +177,12 @@ impl InvalidItem {
 }
 
 struct ValidationResults {
-    invalid_tests: Vec<InvalidItem>,
-    invalid_constants: Vec<InvalidItem>,
-    invalid_scripts: Vec<InvalidItem>,
-    invalid_src: Vec<InvalidItem>,
+    invalid_items: Vec<InvalidItem>,
 }
 
 impl fmt::Display for ValidationResults {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-        for item in &self.invalid_tests {
-            writeln!(f, "{}", item.description())?;
-        }
-        for item in &self.invalid_constants {
-            writeln!(f, "{}", item.description())?;
-        }
-        for item in &self.invalid_scripts {
-            writeln!(f, "{}", item.description())?;
-        }
-        for item in &self.invalid_src {
+        for item in &self.invalid_items {
             writeln!(f, "{}", item.description())?;
         }
         Ok(())
@@ -203,18 +191,11 @@ impl fmt::Display for ValidationResults {
 
 impl ValidationResults {
     const fn new() -> Self {
-        Self {
-            invalid_tests: Vec::new(),
-            invalid_constants: Vec::new(),
-            invalid_scripts: Vec::new(),
-            invalid_src: Vec::new(),
-        }
+        Self { invalid_items: Vec::new() }
     }
 
     fn is_valid(&self) -> bool {
-        self.invalid_tests.is_empty() &&
-            self.invalid_constants.is_empty() &&
-            self.invalid_scripts.is_empty()
+        self.invalid_items.is_empty()
     }
 }
 
@@ -262,7 +243,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                                         )
                                     });
                                     if is_constant && !is_valid_constant_name(&name) {
-                                        results.invalid_constants.push(InvalidItem {
+                                        results.invalid_items.push(InvalidItem {
                                             kind: Validator::Constant,
                                             file: dent.path().display().to_string(),
                                             text: name,
@@ -273,7 +254,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                                     // Validate test function naming convention.
                                     let name = f.name.unwrap().name;
                                     if is_test && !is_valid_test_name(&name) {
-                                        results.invalid_tests.push(InvalidItem {
+                                        results.invalid_items.push(InvalidItem {
                                             kind: Validator::Test,
                                             file: dent.path().display().to_string(),
                                             text: name.clone(),
@@ -295,7 +276,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                                     }
 
                                     if is_src && is_private && !is_valid_src_name(&name) {
-                                        results.invalid_src.push(InvalidItem {
+                                        results.invalid_items.push(InvalidItem {
                                             kind: Validator::Src,
                                             file: dent.path().display().to_string(),
                                             text: name,
@@ -330,7 +311,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
             // TODO Script checks don't really fit nicely into InvalidItem, refactor needed to log
             // more details about the invalid script's ABI.
             if num_public_script_methods > 1 {
-                results.invalid_scripts.push(InvalidItem {
+                results.invalid_items.push(InvalidItem {
                     kind: Validator::Script,
                     file: dent.path().display().to_string(),
                     text: String::new(),
