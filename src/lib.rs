@@ -3,6 +3,7 @@
 #![warn(clippy::all, clippy::pedantic, clippy::cargo, clippy::nursery)]
 
 use colored::Colorize;
+use once_cell::sync::OnceCell;
 use regex::Regex;
 use solang_parser::pt::{
     ContractPart, FunctionAttribute, FunctionDefinition, SourceUnitPart, VariableAttribute,
@@ -348,12 +349,29 @@ fn is_valid_test_name(name: &str) -> bool {
     if !name.starts_with("test") {
         return true // Not a test function, so return.
     }
-    let regex = Regex::new(r"test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w+").unwrap();
+
+    let regex = regex!(r"test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w+");
     regex.is_match(name)
 }
 
 fn is_valid_constant_name(name: &str) -> bool {
     // Make sure it's ALL_CAPS: https://regex101.com/r/Pv9mD8/1
-    let regex = Regex::new(r"^_?[A-Z]+(?:_{0,1}[A-Z]+)*$").unwrap();
+    let regex = regex!(r"^_?[A-Z]+(?:_{0,1}[A-Z]+)*$");
     regex.is_match(name)
+}
+
+#[macro_use]
+mod macros {
+    #[macro_export]
+    /// This is a `regex!` macro which takes a string literal and returns an expression that
+    /// evaluates to a `&'static Regex`. This macro can be useful to avoid the "compile regex on
+    /// every loop iteration" problem. Read more:
+    ///   - <https://docs.rs/once_cell/latest/once_cell/#lazily-compiled-regex/>
+    ///   - <https://docs.rs/regex/latest/regex/#example-avoid-compiling-the-same-regex-in-a-loop/>
+    macro_rules! regex {
+        ($re:literal $(,)?) => {{
+            static RE: OnceCell<Regex> = OnceCell::new();
+            RE.get_or_init(|| Regex::new($re).unwrap())
+        }};
+    }
 }
