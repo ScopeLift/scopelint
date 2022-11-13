@@ -182,6 +182,7 @@ impl InvalidItem {
     }
 }
 
+#[derive(Default)]
 struct ValidationResults {
     invalid_items: Vec<InvalidItem>,
 }
@@ -196,10 +197,6 @@ impl fmt::Display for ValidationResults {
 }
 
 impl ValidationResults {
-    const fn new() -> Self {
-        Self { invalid_items: Vec::new() }
-    }
-
     fn is_valid(&self) -> bool {
         self.invalid_items.is_empty()
     }
@@ -267,7 +264,7 @@ impl Validate for FunctionDefinition {
 
 // Core validation method that walks the filesystem and validates all Solidity files.
 fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
-    let mut results = ValidationResults::new();
+    let mut results = ValidationResults::default();
 
     for path in paths {
         let is_script = path == "./script";
@@ -324,25 +321,11 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                                         num_public_script_methods += 1;
                                     }
                                 }
-                                ContractPart::StructDefinition(_) |
-                                ContractPart::EventDefinition(_) |
-                                ContractPart::EnumDefinition(_) |
-                                ContractPart::ErrorDefinition(_) |
-                                ContractPart::TypeDefinition(_) |
-                                ContractPart::StraySemicolon(_) |
-                                ContractPart::Using(_) => (),
+                                _ => (),
                             }
                         }
                     }
-                    SourceUnitPart::PragmaDirective(_, _, _) |
-                    SourceUnitPart::ImportDirective(_) |
-                    SourceUnitPart::EnumDefinition(_) |
-                    SourceUnitPart::StructDefinition(_) |
-                    SourceUnitPart::EventDefinition(_) |
-                    SourceUnitPart::ErrorDefinition(_) |
-                    SourceUnitPart::TypeDefinition(_) |
-                    SourceUnitPart::Using(_) |
-                    SourceUnitPart::StraySemicolon(_) => (),
+                    _ => (),
                 }
             }
 

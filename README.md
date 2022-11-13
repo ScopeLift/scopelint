@@ -25,5 +25,4 @@ Formatting and checking does the following:
 
 ## Limitations
 
-1. This tool is currently opinionated and does not let you configure it's behavior.
-2. It's regex-based, so it may not be perfect&mdash;for example, it doesn't care that code is commented out.
+This tool is currently opinionated and does not let you configure it's behavior.
