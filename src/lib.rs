@@ -3,29 +3,36 @@
 #![warn(clippy::all, clippy::pedantic, clippy::cargo, clippy::nursery)]
 
 use colored::Colorize;
-use grep::{
-    matcher::Matcher,
-    regex::RegexMatcher,
-    searcher::{sinks::UTF8, BinaryDetection, SearcherBuilder},
-};
+use once_cell::sync::Lazy;
+
 use regex::Regex;
+use solang_parser::pt::{
+    ContractPart, FunctionAttribute, FunctionDefinition, SourceUnitPart, VariableAttribute,
+    VariableDefinition, Visibility,
+};
 use std::{error::Error, ffi::OsStr, fmt, fs, process};
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
+
+// A regex matching test names such as `test_AddsTwoNumbers` or
+// `testFuzz_RevertIf_CallerIsUnauthorized`.
+static RE_VALID_TEST_NAME: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w+").unwrap());
+
+// A regex to ensure constant and immutable variables are in ALL_CAPS: https://regex101.com/r/Pv9mD8/1
+static RE_VALID_CONSTANT_NAME: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^_?[A-Z]+(?:_{0,1}[A-Z]+)*$").unwrap());
 
 // ========================
 // ======== Config ========
 // ========================
 
-// Using this enum and struct to simplify future changes if we allow more
-// granularity, though this is probably overkill, especially since we'd likely
-// use clap if input arguments get more complex.
 enum Mode {
     Format,
     Check,
     Version,
 }
 
-/// Program configuration. Valid modes are `fmt` and `check`.
+/// Program configuration. Valid modes are `fmt`, `check`, and `--version`.
 pub struct Config {
     mode: Mode,
 }
@@ -75,10 +82,12 @@ pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
     }
 }
 
+// Print the package version.
 fn version() {
     println!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
 }
 
+// Format the code, and print details on any invalid items.
 fn fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     // Format Solidity with forge
     let forge_status = process::Command::new("forge").arg("fmt").output()?;
@@ -94,11 +103,12 @@ fn fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     fs::write("./foundry.toml", config_fmt)?;
 
     // Check naming conventions.
-    validate_names()
+    validate_conventions()
 }
 
+// Validate the code formatting, and print details on any invalid items.
 fn check(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
-    let valid_names = validate_names();
+    let valid_names = validate_conventions();
     let valid_fmt = validate_fmt(taplo_opts);
 
     if valid_names.is_ok() && valid_fmt.is_ok() {
@@ -111,6 +121,8 @@ fn check(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
 // =============================
 // ======== Validations ========
 // =============================
+
+// -------- Top level validation methods --------
 
 fn validate_fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     // Check Solidity with `forge fmt`
@@ -136,17 +148,19 @@ fn validate_fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Err
     Ok(())
 }
 
-fn validate_names() -> Result<(), Box<dyn Error>> {
+fn validate_conventions() -> Result<(), Box<dyn Error>> {
     let paths = ["./src", "./script", "./test"];
     let results = validate(paths)?;
 
     if !results.is_valid() {
         eprint!("{results}");
-        eprintln!("{}: Naming conventions failed, see details above", "error".bold().red());
+        eprintln!("{}: Convention checks failed, see details above", "error".bold().red());
         return Err("Invalid names found".into())
     }
     Ok(())
 }
+
+// -------- Validation implementation --------
 
 enum Validator {
     Constant,
@@ -156,9 +170,9 @@ enum Validator {
 }
 
 struct InvalidItem {
+    // TODO Map solang `File` info to line number.
     kind: Validator,
     file: String, // File name.
-    line: u64,    // Line number.
     text: String, // Incorrectly named item.
 }
 
@@ -166,44 +180,27 @@ impl InvalidItem {
     fn description(&self) -> String {
         match self.kind {
             Validator::Test => {
-                format!("Invalid test name in {} on line {}: {}", self.file, self.line, self.text)
+                format!("Invalid test name in {}: {}", self.file, self.text)
             }
             Validator::Constant => {
-                format!(
-                    "Invalid constant or immutable name in {} on line {}: {}",
-                    self.file, self.line, self.text
-                )
+                format!("Invalid constant or immutable name in {}: {}", self.file, self.text)
             }
             Validator::Script => format!("Invalid script interface in {}", self.file),
             Validator::Src => {
-                format!(
-                    "Invalid src method name in {} on line {}: {}",
-                    self.file, self.line, self.text
-                )
+                format!("Invalid src method name in {}: {}", self.file, self.text)
             }
         }
     }
 }
 
+#[derive(Default)]
 struct ValidationResults {
-    invalid_tests: Vec<InvalidItem>,
-    invalid_constants: Vec<InvalidItem>,
-    invalid_scripts: Vec<InvalidItem>,
-    invalid_src: Vec<InvalidItem>,
+    invalid_items: Vec<InvalidItem>,
 }
 
 impl fmt::Display for ValidationResults {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-        for item in &self.invalid_tests {
-            writeln!(f, "{}", item.description())?;
-        }
-        for item in &self.invalid_constants {
-            writeln!(f, "{}", item.description())?;
-        }
-        for item in &self.invalid_scripts {
-            writeln!(f, "{}", item.description())?;
-        }
-        for item in &self.invalid_src {
+        for item in &self.invalid_items {
             writeln!(f, "{}", item.description())?;
         }
         Ok(())
@@ -211,43 +208,78 @@ impl fmt::Display for ValidationResults {
 }
 
 impl ValidationResults {
-    const fn new() -> Self {
-        Self {
-            invalid_tests: Vec::new(),
-            invalid_constants: Vec::new(),
-            invalid_scripts: Vec::new(),
-            invalid_src: Vec::new(),
-        }
-    }
-
     fn is_valid(&self) -> bool {
-        self.invalid_tests.is_empty() &&
-            self.invalid_constants.is_empty() &&
-            self.invalid_scripts.is_empty()
+        self.invalid_items.is_empty()
     }
 }
 
+trait Validate {
+    fn validate(&self, dent: &DirEntry) -> Vec<InvalidItem>;
+}
+
+impl Validate for VariableDefinition {
+    fn validate(&self, dent: &DirEntry) -> Vec<InvalidItem> {
+        let mut invalid_items = Vec::new();
+        let name = &self.name.name;
+
+        // Validate constants and immutables are in ALL_CAPS.
+        let is_constant = self
+            .attrs
+            .iter()
+            .any(|a| matches!(a, VariableAttribute::Constant(_) | VariableAttribute::Immutable(_)));
+        if is_constant && !is_valid_constant_name(name) {
+            invalid_items.push(InvalidItem {
+                kind: Validator::Constant,
+                file: dent.path().display().to_string(),
+                text: name.clone(),
+            });
+        }
+
+        invalid_items
+    }
+}
+
+impl Validate for FunctionDefinition {
+    fn validate(&self, dent: &DirEntry) -> Vec<InvalidItem> {
+        let mut invalid_items = Vec::new();
+        let name = &self.name.as_ref().unwrap().name;
+
+        // Validate test names match the required pattern.
+        if dent.path().starts_with("./test") && !is_valid_test_name(name) {
+            invalid_items.push(InvalidItem {
+                kind: Validator::Test,
+                file: dent.path().display().to_string(),
+                text: name.clone(),
+            });
+        }
+
+        // Validate internal and private src methods start with an underscore.
+        let is_private = self.attributes.iter().any(|a| match a {
+            FunctionAttribute::Visibility(v) => {
+                matches!(v, Visibility::Private(_) | Visibility::Internal(_))
+            }
+            _ => false,
+        });
+
+        if dent.path().starts_with("./src") && is_private && !name.starts_with('_') {
+            invalid_items.push(InvalidItem {
+                kind: Validator::Src,
+                file: dent.path().display().to_string(),
+                text: name.clone(),
+            });
+        }
+
+        invalid_items
+    }
+}
+
+// Core validation method that walks the filesystem and validates all Solidity files.
 fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
-    // Test and constant matchers are a single line, so we use `new_line_matcher`, but function
-    // signatures may be multi-line, so we use `new`.
-    let test_matcher = RegexMatcher::new_line_matcher(r"function\s*test\w+\(")?;
-    let constant_matcher = RegexMatcher::new_line_matcher(r"\sconstant\s")?;
-    let fn_matcher = RegexMatcher::new(r"function\s+\w+\([\w\s,]*\)[\w\s]*\{")?;
-
-    let mut searcher = SearcherBuilder::new()
-        .binary_detection(BinaryDetection::quit(b'\x00'))
-        .line_number(true)
-        .build();
-
-    let mut multiline_searcher = SearcherBuilder::new()
-        .binary_detection(BinaryDetection::quit(b'\x00'))
-        .line_number(true)
-        .multi_line(true)
-        .build();
-
-    let mut results = ValidationResults::new();
+    let mut results = ValidationResults::default();
 
     for path in paths {
+        let is_script = path == "./script";
+
         for result in WalkDir::new(path) {
             let dent = match result {
                 Ok(dent) => dent,
@@ -261,171 +293,75 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                 continue
             }
 
-            // Validate test naming convention.
-            searcher.search_path(
-                &test_matcher,
-                dent.path(),
-                UTF8(|lnum, line| {
-                    if let Some(i) = check_test(&test_matcher, &dent, lnum, line) {
-                        results.invalid_tests.push(i);
-                    }
-                    Ok(true)
-                }),
-            )?;
+            // Get the parse tree (pt) of the file.
+            let content = fs::read_to_string(dent.path())?;
+            let (pt, _comments) = solang_parser::parse(&content, 0).expect("Parsing failed");
 
-            // Validate constant/immutable naming convention.
-            searcher.search_path(
-                &constant_matcher,
-                dent.path(),
-                UTF8(|lnum, line| {
-                    if let Some(item) = check_constant(&dent, lnum, line) {
-                        results.invalid_constants.push(item);
-                    }
-                    Ok(true)
-                }),
-            )?;
+            // Variables used to track status of checks that are file-wide.
+            let mut num_public_script_methods = 0;
 
-            // Validate src contract function names have leading underscores if internal/private.
-            if path == "./src" {
-                multiline_searcher.search_path(
-                    &fn_matcher,
-                    dent.path(),
-                    UTF8(|lnum, line| {
-                        if let Some(item) = check_src_fn(&fn_matcher, &dent, lnum, line) {
-                            results.invalid_src.push(item);
+            // Run checks.
+            for element in pt.0 {
+                match element {
+                    SourceUnitPart::FunctionDefinition(f) => {
+                        results.invalid_items.extend(f.validate(&dent));
+                    }
+                    SourceUnitPart::VariableDefinition(v) => {
+                        results.invalid_items.extend(v.validate(&dent));
+                    }
+                    SourceUnitPart::ContractDefinition(c) => {
+                        for el in c.parts {
+                            match el {
+                                ContractPart::VariableDefinition(v) => {
+                                    results.invalid_items.extend(v.validate(&dent));
+                                }
+                                ContractPart::FunctionDefinition(f) => {
+                                    results.invalid_items.extend(f.validate(&dent));
+
+                                    let name = f.name.unwrap().name;
+                                    let is_private = f.attributes.iter().any(|a| match a {
+                                        FunctionAttribute::Visibility(v) => {
+                                            matches!(
+                                                v,
+                                                Visibility::Private(_) | Visibility::Internal(_)
+                                            )
+                                        }
+                                        _ => false,
+                                    });
+                                    if is_script && !is_private && name != "setUp" {
+                                        num_public_script_methods += 1;
+                                    }
+                                }
+                                _ => (),
+                            }
                         }
-                        Ok(true)
-                    }),
-                )?;
+                    }
+                    _ => (),
+                }
             }
 
             // Validate scripts only have a single run method.
-            if path == "./script" {
-                if let Some(i) = check_script(&dent)? {
-                    results.invalid_scripts.push(i);
-                }
+            // TODO Script checks don't really fit nicely into InvalidItem, refactor needed to log
+            // more details about the invalid script's ABI.
+            if num_public_script_methods > 1 {
+                results.invalid_items.push(InvalidItem {
+                    kind: Validator::Script,
+                    file: dent.path().display().to_string(),
+                    text: String::new(),
+                });
             }
         }
     }
     Ok(results)
 }
 
-fn check_test(
-    matcher: &RegexMatcher,
-    dent: &walkdir::DirEntry,
-    lnum: u64,
-    line: &str,
-) -> Option<InvalidItem> {
-    // We are guaranteed to find a match, so the unwrap is ok.
-    let the_match = matcher.find(line.as_bytes()).unwrap().unwrap();
-    let text = line[the_match].to_string();
-
-    // Check if it matches our pattern.
-    let pattern = r"test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w+\(";
-    let validator = RegexMatcher::new_line_matcher(pattern).unwrap();
-
-    // If match is found, test name is good, otherwise it's bad.
-    let match_result = validator.find(text.as_bytes()).unwrap();
-    if match_result.is_some() {
-        return None
+fn is_valid_test_name(name: &str) -> bool {
+    if !name.starts_with("test") {
+        return true // Not a test function, so return.
     }
-
-    let trimmed_test = text.trim();
-    let item = InvalidItem {
-        kind: Validator::Test,
-        file: dent.path().to_str().unwrap().to_string(),
-        line: lnum,
-        // Trim off the leading "function " and remove the trailing "(".
-        text: trimmed_test[9..trimmed_test.len() - 1].to_string(),
-    };
-
-    Some(item)
+    RE_VALID_TEST_NAME.is_match(name)
 }
 
-fn check_src_fn(
-    matcher: &RegexMatcher,
-    dent: &walkdir::DirEntry,
-    lnum: u64,
-    line: &str,
-) -> Option<InvalidItem> {
-    // We are guaranteed to find a match, so the unwrap is ok.
-    let the_match = matcher.find(line.as_bytes()).unwrap().unwrap();
-    let text = line[the_match].to_string();
-
-    // Ensure public/external functions have no leading underscore, and internal/private functions
-    // have a leading underscore.
-    let vis_validator = RegexMatcher::new_line_matcher(r"\b(public|external)\b").unwrap();
-    let is_public = vis_validator.find(text.as_bytes()).unwrap();
-    let name = text[9..text.len() - 1].to_string();
-    let first_char = name.trim().chars().next()?;
-
-    if is_public.is_some() && first_char != '_' || is_public.is_none() && first_char == '_' {
-        return None
-    }
-
-    let item = InvalidItem {
-        kind: Validator::Src,
-        file: dent.path().to_str().unwrap().to_string(),
-        line: lnum,
-        // Trim off the leading "function " and remove the trailing "(".
-        text: name,
-    };
-    Some(item)
-}
-
-fn check_constant(dent: &walkdir::DirEntry, lnum: u64, line: &str) -> Option<InvalidItem> {
-    // Found a constant/immutable, get the var name.
-    let r = Regex::new(r"(;|=)").unwrap();
-    let mut split_str = r.split(line);
-    let var = split_str.next().expect("no match 1").split_whitespace().last().expect("no match 2");
-
-    // Make sure it's ALL_CAPS: https://regex101.com/r/Pv9mD8/1
-    let name_validator = RegexMatcher::new_line_matcher(r"^_?[A-Z]+(?:_{0,1}[A-Z]+)*$").unwrap();
-
-    // If match is found, test name is good, otherwise it's bad.
-    let match_result = name_validator.find(var.as_bytes()).unwrap();
-    if match_result.is_some() {
-        return None
-    }
-
-    let item = InvalidItem {
-        kind: Validator::Constant,
-        file: dent.path().to_str().unwrap().to_string(),
-        line: lnum,
-        text: var.to_string(),
-    };
-    Some(item)
-}
-
-fn check_script(dent: &walkdir::DirEntry) -> Result<Option<InvalidItem>, Box<dyn Error>> {
-    let mut fns_found = 0;
-    let mut found_run_fn = false;
-
-    let text = fs::read_to_string(dent.path())?;
-    let fn_regex = Regex::new(r"function\s*\w*\([\w\s,]*\)[\w\s]*\{").unwrap();
-    let setup_regex = Regex::new(r"function\s*setUp\(").unwrap();
-    let public_regex = Regex::new(r"\b(public|external)\b").unwrap();
-    let run_regex = Regex::new(r"\brun\b").unwrap();
-
-    for cap in fn_regex.captures_iter(&text) {
-        let text = &cap[0];
-        if !setup_regex.is_match(text) && public_regex.is_match(text) {
-            fns_found += 1;
-            found_run_fn = found_run_fn || run_regex.is_match(text);
-        }
-    }
-
-    if fns_found == 1 && found_run_fn {
-        Ok(None)
-    } else {
-        // We only return 1 item to summarize the file.
-        // TODO Script checks don't really fit nicely into InvalidItem, refactor needed to log more
-        // details about the invalid script's ABI.
-        Ok(Some(InvalidItem {
-            kind: Validator::Script,
-            file: dent.path().to_str().unwrap().to_string(),
-            line: u64::MAX,      // We don't have the line number.
-            text: String::new(), // We don't return the text for now.
-        }))
-    }
+fn is_valid_constant_name(name: &str) -> bool {
+    RE_VALID_CONSTANT_NAME.is_match(name)
 }
