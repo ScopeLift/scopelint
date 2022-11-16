@@ -174,20 +174,27 @@ struct InvalidItem {
     kind: Validator,
     file: String, // File name.
     text: String, // Incorrectly named item.
+    line: usize,  // Line number.
 }
 
 impl InvalidItem {
     fn description(&self) -> String {
         match self.kind {
             Validator::Test => {
-                format!("Invalid test name in {}: {}", self.file, self.text)
+                format!("Invalid test name in {} on line {}: {}", self.file, self.line, self.text)
             }
             Validator::Constant => {
-                format!("Invalid constant or immutable name in {}: {}", self.file, self.text)
+                format!(
+                    "Invalid constant or immutable name in {} on line {}: {}",
+                    self.file, self.line, self.text
+                )
             }
             Validator::Script => format!("Invalid script interface in {}", self.file),
             Validator::Src => {
-                format!("Invalid src method name in {}: {}", self.file, self.text)
+                format!(
+                    "Invalid src method name in {} on line {}: {}",
+                    self.file, self.line, self.text
+                )
             }
         }
     }
@@ -214,7 +221,7 @@ impl ValidationResults {
 }
 
 trait Validate {
-    fn validate(&self, dent: &DirEntry) -> Vec<InvalidItem>;
+    fn validate(&self, content: &str, dent: &DirEntry) -> Vec<InvalidItem>;
 }
 
 trait Name {
@@ -222,7 +229,7 @@ trait Name {
 }
 
 impl Validate for VariableDefinition {
-    fn validate(&self, dent: &DirEntry) -> Vec<InvalidItem> {
+    fn validate(&self, content: &str, dent: &DirEntry) -> Vec<InvalidItem> {
         let mut invalid_items = Vec::new();
         let name = &self.name.name;
 
@@ -236,6 +243,7 @@ impl Validate for VariableDefinition {
                 kind: Validator::Constant,
                 file: dent.path().display().to_string(),
                 text: name.clone(),
+                line: offset_to_line(content, self.loc.start()),
             });
         }
 
@@ -255,7 +263,7 @@ impl Name for FunctionDefinition {
 }
 
 impl Validate for FunctionDefinition {
-    fn validate(&self, dent: &DirEntry) -> Vec<InvalidItem> {
+    fn validate(&self, content: &str, dent: &DirEntry) -> Vec<InvalidItem> {
         let mut invalid_items = Vec::new();
         let name = &self.name();
 
@@ -265,6 +273,7 @@ impl Validate for FunctionDefinition {
                 kind: Validator::Test,
                 file: dent.path().display().to_string(),
                 text: name.to_string(),
+                line: offset_to_line(content, self.loc.start()),
             });
         }
 
@@ -281,6 +290,7 @@ impl Validate for FunctionDefinition {
                 kind: Validator::Src,
                 file: dent.path().display().to_string(),
                 text: name.to_string(),
+                line: offset_to_line(content, self.loc.start()),
             });
         }
 
@@ -319,19 +329,19 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
             for element in pt.0 {
                 match element {
                     SourceUnitPart::FunctionDefinition(f) => {
-                        results.invalid_items.extend(f.validate(&dent));
+                        results.invalid_items.extend(f.validate(&content, &dent));
                     }
                     SourceUnitPart::VariableDefinition(v) => {
-                        results.invalid_items.extend(v.validate(&dent));
+                        results.invalid_items.extend(v.validate(&content, &dent));
                     }
                     SourceUnitPart::ContractDefinition(c) => {
                         for el in c.parts {
                             match el {
                                 ContractPart::VariableDefinition(v) => {
-                                    results.invalid_items.extend(v.validate(&dent));
+                                    results.invalid_items.extend(v.validate(&content, &dent));
                                 }
                                 ContractPart::FunctionDefinition(f) => {
-                                    results.invalid_items.extend(f.validate(&dent));
+                                    results.invalid_items.extend(f.validate(&content, &dent));
 
                                     let name = f.name();
                                     let is_private = f.attributes.iter().any(|a| match a {
@@ -363,6 +373,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                     kind: Validator::Script,
                     file: dent.path().display().to_string(),
                     text: String::new(),
+                    line: 0, // This spans multiple lines, so we don't have a line number.
                 });
             }
         }
@@ -379,4 +390,21 @@ fn is_valid_test_name(name: &str) -> bool {
 
 fn is_valid_constant_name(name: &str) -> bool {
     RE_VALID_CONSTANT_NAME.is_match(name)
+}
+
+// Converts the start offset of a `Loc` to `(line, col)`. Modified from https://github.com/foundry-rs/foundry/blob/45b9dccdc8584fb5fbf55eb190a880d4e3b0753f/fmt/src/helpers.rs#L54-L70
+fn offset_to_line(content: &str, start: usize) -> usize {
+    debug_assert!(content.len() > start);
+
+    let mut line_counter = 1; // First line is `1`.
+    for (offset, c) in content.chars().enumerate() {
+        if c == '\n' {
+            line_counter += 1;
+        }
+        if offset > start {
+            return line_counter
+        }
+    }
+
+    unreachable!("content.len() > start")
 }
