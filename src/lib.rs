@@ -358,7 +358,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
             // Validate scripts only have a single run method.
             // TODO Script checks don't really fit nicely into InvalidItem, refactor needed to log
             // more details about the invalid script's ABI.
-            if num_public_script_methods > 1 {
+            if is_script && num_public_script_methods != 1 {
                 results.invalid_items.push(InvalidItem {
                     kind: Validator::Script,
                     file: dent.path().display().to_string(),
