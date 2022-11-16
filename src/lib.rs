@@ -365,10 +365,11 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                 }
             }
 
-            // Validate scripts only have a single run method.
+            // Validate scripts only have a single public run method, or no public methods (i.e.
+            // it's a helper contract not a script).
             // TODO Script checks don't really fit nicely into InvalidItem, refactor needed to log
             // more details about the invalid script's ABI.
-            if is_script && num_public_script_methods != 1 {
+            if is_script && num_public_script_methods > 1 {
                 results.invalid_items.push(InvalidItem {
                     kind: Validator::Script,
                     file: dent.path().display().to_string(),
