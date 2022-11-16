@@ -7,8 +7,8 @@ use once_cell::sync::Lazy;
 
 use regex::Regex;
 use solang_parser::pt::{
-    ContractPart, FunctionAttribute, FunctionDefinition, SourceUnitPart, VariableAttribute,
-    VariableDefinition, Visibility,
+    ContractPart, FunctionAttribute, FunctionDefinition, FunctionTy, SourceUnitPart,
+    VariableAttribute, VariableDefinition, Visibility,
 };
 use std::{error::Error, ffi::OsStr, fmt, fs, process};
 use walkdir::{DirEntry, WalkDir};
@@ -217,6 +217,10 @@ trait Validate {
     fn validate(&self, dent: &DirEntry) -> Vec<InvalidItem>;
 }
 
+trait Name {
+    fn name(&self) -> String;
+}
+
 impl Validate for VariableDefinition {
     fn validate(&self, dent: &DirEntry) -> Vec<InvalidItem> {
         let mut invalid_items = Vec::new();
@@ -239,17 +243,28 @@ impl Validate for VariableDefinition {
     }
 }
 
+impl Name for FunctionDefinition {
+    fn name(&self) -> String {
+        match self.ty {
+            FunctionTy::Constructor => "constructor".to_string(),
+            FunctionTy::Fallback => "fallback".to_string(),
+            FunctionTy::Receive => "receive".to_string(),
+            FunctionTy::Function | FunctionTy::Modifier => self.name.as_ref().unwrap().name.clone(),
+        }
+    }
+}
+
 impl Validate for FunctionDefinition {
     fn validate(&self, dent: &DirEntry) -> Vec<InvalidItem> {
         let mut invalid_items = Vec::new();
-        let name = &self.name.as_ref().unwrap().name;
+        let name = &self.name();
 
         // Validate test names match the required pattern.
         if dent.path().starts_with("./test") && !is_valid_test_name(name) {
             invalid_items.push(InvalidItem {
                 kind: Validator::Test,
                 file: dent.path().display().to_string(),
-                text: name.clone(),
+                text: name.to_string(),
             });
         }
 
@@ -265,7 +280,7 @@ impl Validate for FunctionDefinition {
             invalid_items.push(InvalidItem {
                 kind: Validator::Src,
                 file: dent.path().display().to_string(),
-                text: name.clone(),
+                text: name.to_string(),
             });
         }
 
@@ -318,7 +333,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                                 ContractPart::FunctionDefinition(f) => {
                                     results.invalid_items.extend(f.validate(&dent));
 
-                                    let name = f.name.unwrap().name;
+                                    let name = f.name();
                                     let is_private = f.attributes.iter().any(|a| match a {
                                         FunctionAttribute::Visibility(v) => {
                                             matches!(
