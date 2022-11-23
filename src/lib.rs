@@ -303,8 +303,6 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
     let mut results = ValidationResults::default();
 
     for path in paths {
-        let is_script = path == "./script";
-
         for result in WalkDir::new(path) {
             let dent = match result {
                 Ok(dent) => dent,
@@ -317,6 +315,11 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
             if !dent.file_type().is_file() || dent.path().extension() != Some(OsStr::new("sol")) {
                 continue
             }
+
+            // Executable script files are expected to end with `.s.sol`, whereas non-executable
+            // helper contracts in the scripts dir just end with `.sol`.
+            let is_script =
+                path == "./script" && dent.path().to_str().expect("Bad path").ends_with(".s.sol");
 
             // Get the parse tree (pt) of the file.
             let content = fs::read_to_string(dent.path())?;
@@ -369,7 +372,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
             // it's a helper contract not a script).
             // TODO Script checks don't really fit nicely into InvalidItem, refactor needed to log
             // more details about the invalid script's ABI.
-            if is_script && num_public_script_methods > 1 {
+            if is_script && num_public_script_methods != 1 {
                 results.invalid_items.push(InvalidItem {
                     kind: Validator::Script,
                     file: dent.path().display().to_string(),

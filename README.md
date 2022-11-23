@@ -12,7 +12,7 @@ Formatting and checking does the following:
 - Uses the `taplo` crate to format TOML.
 - Validates test names follow a convention of `test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w{1,}`.
 - Validates constants and immutables are in `ALL_CAPS`.
-- Validates function names and visibility in forge scripts to 1 public `run` method per script.
+- Validates function names and visibility in forge scripts to 1 public `run` method per script (executable script files are expected to end with `.s.sol`, whereas non-executable helper contracts in the scripts dir just end with `.sol`).
 - Validates internal functions in `src/` start with a leading underscore.
 
 ## Usage
