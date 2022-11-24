@@ -170,10 +170,9 @@ enum Validator {
 }
 
 struct InvalidItem {
-    // TODO Map solang `File` info to line number.
     kind: Validator,
     file: String, // File name.
-    text: String, // Incorrectly named item.
+    text: String, // Details to show about the invalid item.
     line: usize,  // Line number.
 }
 
@@ -189,7 +188,9 @@ impl InvalidItem {
                     self.file, self.line, self.text
                 )
             }
-            Validator::Script => format!("Invalid script interface in {}", self.file),
+            Validator::Script => {
+                format!("Invalid script interface in {}: {}", self.file, self.text)
+            }
             Validator::Src => {
                 format!(
                     "Invalid src method name in {} on line {}: {}",
@@ -326,7 +327,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
             let (pt, _comments) = solang_parser::parse(&content, 0).expect("Parsing failed");
 
             // Variables used to track status of checks that are file-wide.
-            let mut num_public_script_methods = 0;
+            let mut public_methods: Vec<String> = Vec::new();
 
             // Run checks.
             for element in pt.0 {
@@ -356,8 +357,13 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                                         }
                                         _ => false,
                                     });
-                                    if is_script && !is_private && name != "setUp" {
-                                        num_public_script_methods += 1;
+
+                                    if is_script &&
+                                        !is_private &&
+                                        name != "setUp" &&
+                                        name != "constructor"
+                                    {
+                                        public_methods.push(name);
                                     }
                                 }
                                 _ => (),
@@ -370,15 +376,36 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
 
             // Validate scripts only have a single public run method, or no public methods (i.e.
             // it's a helper contract not a script).
-            // TODO Script checks don't really fit nicely into InvalidItem, refactor needed to log
-            // more details about the invalid script's ABI.
-            if is_script && num_public_script_methods != 1 {
-                results.invalid_items.push(InvalidItem {
-                    kind: Validator::Script,
-                    file: dent.path().display().to_string(),
-                    text: String::new(),
-                    line: 0, // This spans multiple lines, so we don't have a line number.
-                });
+            if is_script {
+                // If we have no public methods, the `run` method is missing.
+                match public_methods.len() {
+                    0 => {
+                        results.invalid_items.push(InvalidItem {
+                            kind: Validator::Script,
+                            file: dent.path().display().to_string(),
+                            text: "No `run` method found".to_string(),
+                            line: 0, // This spans multiple lines, so we don't have a line number.
+                        });
+                    }
+                    1 => {
+                        if public_methods[0] != "run" {
+                            results.invalid_items.push(InvalidItem {
+                                kind: Validator::Script,
+                                file: dent.path().display().to_string(),
+                                text: "The only public method must be named `run`".to_string(),
+                                line: 0,
+                            });
+                        }
+                    }
+                    _ => {
+                        results.invalid_items.push(InvalidItem {
+                            kind: Validator::Script,
+                            file: dent.path().display().to_string(),
+                            text: format!("Scripts must have a single public method named `run`, but the following methods were found: {public_methods:?}"),
+                            line: 0,
+                        });
+                    }
+                }
             }
         }
     }
