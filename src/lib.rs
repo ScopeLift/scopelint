@@ -7,8 +7,8 @@ use once_cell::sync::Lazy;
 
 use regex::Regex;
 use solang_parser::pt::{
-    ContractPart, FunctionAttribute, FunctionDefinition, SourceUnitPart, VariableAttribute,
-    VariableDefinition, Visibility,
+    ContractPart, FunctionAttribute, FunctionDefinition, FunctionTy, SourceUnitPart,
+    VariableAttribute, VariableDefinition, Visibility,
 };
 use std::{error::Error, ffi::OsStr, fmt, fs, process};
 use walkdir::{DirEntry, WalkDir};
@@ -170,24 +170,32 @@ enum Validator {
 }
 
 struct InvalidItem {
-    // TODO Map solang `File` info to line number.
     kind: Validator,
     file: String, // File name.
-    text: String, // Incorrectly named item.
+    text: String, // Details to show about the invalid item.
+    line: usize,  // Line number.
 }
 
 impl InvalidItem {
     fn description(&self) -> String {
         match self.kind {
             Validator::Test => {
-                format!("Invalid test name in {}: {}", self.file, self.text)
+                format!("Invalid test name in {} on line {}: {}", self.file, self.line, self.text)
             }
             Validator::Constant => {
-                format!("Invalid constant or immutable name in {}: {}", self.file, self.text)
+                format!(
+                    "Invalid constant or immutable name in {} on line {}: {}",
+                    self.file, self.line, self.text
+                )
             }
-            Validator::Script => format!("Invalid script interface in {}", self.file),
+            Validator::Script => {
+                format!("Invalid script interface in {}: {}", self.file, self.text)
+            }
             Validator::Src => {
-                format!("Invalid src method name in {}: {}", self.file, self.text)
+                format!(
+                    "Invalid src method name in {} on line {}: {}",
+                    self.file, self.line, self.text
+                )
             }
         }
     }
@@ -214,11 +222,15 @@ impl ValidationResults {
 }
 
 trait Validate {
-    fn validate(&self, dent: &DirEntry) -> Vec<InvalidItem>;
+    fn validate(&self, content: &str, dent: &DirEntry) -> Vec<InvalidItem>;
+}
+
+trait Name {
+    fn name(&self) -> String;
 }
 
 impl Validate for VariableDefinition {
-    fn validate(&self, dent: &DirEntry) -> Vec<InvalidItem> {
+    fn validate(&self, content: &str, dent: &DirEntry) -> Vec<InvalidItem> {
         let mut invalid_items = Vec::new();
         let name = &self.name.name;
 
@@ -232,6 +244,7 @@ impl Validate for VariableDefinition {
                 kind: Validator::Constant,
                 file: dent.path().display().to_string(),
                 text: name.clone(),
+                line: offset_to_line(content, self.loc.start()),
             });
         }
 
@@ -239,17 +252,29 @@ impl Validate for VariableDefinition {
     }
 }
 
+impl Name for FunctionDefinition {
+    fn name(&self) -> String {
+        match self.ty {
+            FunctionTy::Constructor => "constructor".to_string(),
+            FunctionTy::Fallback => "fallback".to_string(),
+            FunctionTy::Receive => "receive".to_string(),
+            FunctionTy::Function | FunctionTy::Modifier => self.name.as_ref().unwrap().name.clone(),
+        }
+    }
+}
+
 impl Validate for FunctionDefinition {
-    fn validate(&self, dent: &DirEntry) -> Vec<InvalidItem> {
+    fn validate(&self, content: &str, dent: &DirEntry) -> Vec<InvalidItem> {
         let mut invalid_items = Vec::new();
-        let name = &self.name.as_ref().unwrap().name;
+        let name = &self.name();
 
         // Validate test names match the required pattern.
         if dent.path().starts_with("./test") && !is_valid_test_name(name) {
             invalid_items.push(InvalidItem {
                 kind: Validator::Test,
                 file: dent.path().display().to_string(),
-                text: name.clone(),
+                text: name.to_string(),
+                line: offset_to_line(content, self.loc.start()),
             });
         }
 
@@ -265,7 +290,8 @@ impl Validate for FunctionDefinition {
             invalid_items.push(InvalidItem {
                 kind: Validator::Src,
                 file: dent.path().display().to_string(),
-                text: name.clone(),
+                text: name.to_string(),
+                line: offset_to_line(content, self.loc.start()),
             });
         }
 
@@ -278,8 +304,6 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
     let mut results = ValidationResults::default();
 
     for path in paths {
-        let is_script = path == "./script";
-
         for result in WalkDir::new(path) {
             let dent = match result {
                 Ok(dent) => dent,
@@ -293,32 +317,37 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                 continue
             }
 
+            // Executable script files are expected to end with `.s.sol`, whereas non-executable
+            // helper contracts in the scripts dir just end with `.sol`.
+            let is_script =
+                path == "./script" && dent.path().to_str().expect("Bad path").ends_with(".s.sol");
+
             // Get the parse tree (pt) of the file.
             let content = fs::read_to_string(dent.path())?;
             let (pt, _comments) = solang_parser::parse(&content, 0).expect("Parsing failed");
 
             // Variables used to track status of checks that are file-wide.
-            let mut num_public_script_methods = 0;
+            let mut public_methods: Vec<String> = Vec::new();
 
             // Run checks.
             for element in pt.0 {
                 match element {
                     SourceUnitPart::FunctionDefinition(f) => {
-                        results.invalid_items.extend(f.validate(&dent));
+                        results.invalid_items.extend(f.validate(&content, &dent));
                     }
                     SourceUnitPart::VariableDefinition(v) => {
-                        results.invalid_items.extend(v.validate(&dent));
+                        results.invalid_items.extend(v.validate(&content, &dent));
                     }
                     SourceUnitPart::ContractDefinition(c) => {
                         for el in c.parts {
                             match el {
                                 ContractPart::VariableDefinition(v) => {
-                                    results.invalid_items.extend(v.validate(&dent));
+                                    results.invalid_items.extend(v.validate(&content, &dent));
                                 }
                                 ContractPart::FunctionDefinition(f) => {
-                                    results.invalid_items.extend(f.validate(&dent));
+                                    results.invalid_items.extend(f.validate(&content, &dent));
 
-                                    let name = f.name.unwrap().name;
+                                    let name = f.name();
                                     let is_private = f.attributes.iter().any(|a| match a {
                                         FunctionAttribute::Visibility(v) => {
                                             matches!(
@@ -328,8 +357,13 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                                         }
                                         _ => false,
                                     });
-                                    if is_script && !is_private && name != "setUp" {
-                                        num_public_script_methods += 1;
+
+                                    if is_script &&
+                                        !is_private &&
+                                        name != "setUp" &&
+                                        name != "constructor"
+                                    {
+                                        public_methods.push(name);
                                     }
                                 }
                                 _ => (),
@@ -340,15 +374,38 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                 }
             }
 
-            // Validate scripts only have a single run method.
-            // TODO Script checks don't really fit nicely into InvalidItem, refactor needed to log
-            // more details about the invalid script's ABI.
-            if num_public_script_methods > 1 {
-                results.invalid_items.push(InvalidItem {
-                    kind: Validator::Script,
-                    file: dent.path().display().to_string(),
-                    text: String::new(),
-                });
+            // Validate scripts only have a single public run method, or no public methods (i.e.
+            // it's a helper contract not a script).
+            if is_script {
+                // If we have no public methods, the `run` method is missing.
+                match public_methods.len() {
+                    0 => {
+                        results.invalid_items.push(InvalidItem {
+                            kind: Validator::Script,
+                            file: dent.path().display().to_string(),
+                            text: "No `run` method found".to_string(),
+                            line: 0, // This spans multiple lines, so we don't have a line number.
+                        });
+                    }
+                    1 => {
+                        if public_methods[0] != "run" {
+                            results.invalid_items.push(InvalidItem {
+                                kind: Validator::Script,
+                                file: dent.path().display().to_string(),
+                                text: "The only public method must be named `run`".to_string(),
+                                line: 0,
+                            });
+                        }
+                    }
+                    _ => {
+                        results.invalid_items.push(InvalidItem {
+                            kind: Validator::Script,
+                            file: dent.path().display().to_string(),
+                            text: format!("Scripts must have a single public method named `run` (excluding `setUp`), but the following methods were found: {public_methods:?}"),
+                            line: 0,
+                        });
+                    }
+                }
             }
         }
     }
@@ -364,4 +421,21 @@ fn is_valid_test_name(name: &str) -> bool {
 
 fn is_valid_constant_name(name: &str) -> bool {
     RE_VALID_CONSTANT_NAME.is_match(name)
+}
+
+// Converts the start offset of a `Loc` to `(line, col)`. Modified from https://github.com/foundry-rs/foundry/blob/45b9dccdc8584fb5fbf55eb190a880d4e3b0753f/fmt/src/helpers.rs#L54-L70
+fn offset_to_line(content: &str, start: usize) -> usize {
+    debug_assert!(content.len() > start);
+
+    let mut line_counter = 1; // First line is `1`.
+    for (offset, c) in content.chars().enumerate() {
+        if c == '\n' {
+            line_counter += 1;
+        }
+        if offset > start {
+            return line_counter
+        }
+    }
+
+    unreachable!("content.len() > start")
 }
