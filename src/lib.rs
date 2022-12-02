@@ -401,7 +401,7 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                         results.invalid_items.push(InvalidItem {
                             kind: Validator::Script,
                             file: dent.path().display().to_string(),
-                            text: format!("Scripts must have a single public method named `run`, but the following methods were found: {public_methods:?}"),
+                            text: format!("Scripts must have a single public method named `run` (excluding `setUp`), but the following methods were found: {public_methods:?}"),
                             line: 0,
                         });
                     }
