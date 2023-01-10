@@ -13,14 +13,15 @@ use solang_parser::pt::{
 use std::{error::Error, ffi::OsStr, fmt, fs, process};
 use walkdir::{DirEntry, WalkDir};
 
-// A regex matching test names such as `test_AddsTwoNumbers` or
-// `testFuzz_RevertIf_CallerIsUnauthorized`.
-static RE_VALID_TEST_NAME: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"test(Fork)?(Fuzz)?_(Revert(If_|When_){1})?\w+").unwrap());
+// A regex matching valid test names, see the `validate_test_names_regex` test for examples.
+static RE_VALID_TEST_NAME: Lazy<Regex> = Lazy::new(|| {
+    let r = r"^test(Fork)?(Fuzz)?(_Revert(If|When|On))?_([^_RevertIf_RevertWhen_RevertOn]\w+)*$";
+    Regex::new(r).unwrap()
+});
 
-// A regex to ensure constant and immutable variables are in ALL_CAPS: https://regex101.com/r/Pv9mD8/1
+// A regex matching valid constant names, see the `validate_constant_names_regex` test for examples.
 static RE_VALID_CONSTANT_NAME: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^_?[A-Z]+(?:_{0,1}[A-Z]+)*$").unwrap());
+    Lazy::new(|| Regex::new(r"^(?:[$_]*[A-Z][$_]*){1,}$").unwrap());
 
 // ========================
 // ======== Config ========
@@ -438,4 +439,101 @@ fn offset_to_line(content: &str, start: usize) -> usize {
     }
 
     unreachable!("content.len() > start")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_test_name_regex() {
+        let allowed_names = vec![
+            "test_Description",
+            "testFuzz_Description",
+            "testFork_Description",
+            "testForkFuzz_Description",
+            "testForkFuzz_Description_MoreInfo",
+            "test_RevertIf_Condition",
+            "test_RevertWhen_Condition",
+            "test_RevertOn_Condition",
+            "test_RevertOn_Condition_MoreInfo",
+            "testFuzz_RevertIf_Condition",
+            "testFuzz_RevertWhen_Condition",
+            "testFuzz_RevertOn_Condition",
+            "testFuzz_RevertOn_Condition_MoreInfo",
+            "testForkFuzz_RevertIf_Condition",
+            "testForkFuzz_RevertWhen_Condition",
+            "testForkFuzz_RevertOn_Condition",
+            "testForkFuzz_RevertOn_Condition_MoreInfo",
+            "testForkFuzz_RevertOn_Condition_MoreInfo_Wow",
+            "testForkFuzz_RevertOn_Condition_MoreInfo_Wow_As_Many_Underscores_As_You_Want",
+        ];
+
+        let disallowed_names = [
+            "test",
+            "testDescription",
+            "testDescriptionMoreInfo",
+            "test_RevertIfCondition",
+            "test_RevertWhenCondition",
+            "test_RevertOnCondition",
+            "testFuzz_RevertIfDescription",
+            "testFuzz_RevertWhenDescription",
+            "testFuzz_RevertOnDescription",
+            "testForkFuzz_RevertIfCondition",
+            "testForkFuzz_RevertWhenCondition",
+            "testForkFuzz_RevertOnCondition",
+        ];
+
+        for name in allowed_names {
+            assert_eq!(is_valid_test_name(name), true, "{name}");
+        }
+
+        for name in disallowed_names {
+            assert_eq!(is_valid_test_name(name), false, "{name}");
+        }
+    }
+
+    #[test]
+    fn validate_constant_name_regex() {
+        let allowed_names = vec![
+            "VARIABLE",
+            "VARIABLE_NAME",
+            "VARIABLE_NAME_",
+            "VARIABLE___NAME",
+            "VARIABLE_NAME_WOW",
+            "VARIABLE_NAME_WOW_AS_MANY_UNDERSCORES_AS_YOU_WANT",
+            "__VARIABLE",
+            "_VARIABLE__NAME",
+            "_VARIABLE_NAME__",
+            "_VARIABLE_NAME_WOW",
+            "_VARIABLE_NAME_WOW_AS_MANY_UNDERSCORES_AS_YOU_WANT",
+            "$VARIABLE_NAME",
+            "_$VARIABLE_NAME_",
+            "$_VARIABLE_NAME$",
+            "_$VARIABLE_NAME$_",
+            "$_VARIABLE_NAME_$",
+            "$_VARIABLE__NAME_",
+        ];
+
+        let disallowed_names = [
+            "variable",
+            "variableName",
+            "_variable",
+            "_variable_Name",
+            "VARIABLe",
+            "VARIABLE_name",
+            "_VARIABLe",
+            "_VARIABLE_name",
+            "$VARIABLe",
+            "$VARIABLE_name",
+        ];
+
+        for name in allowed_names {
+            assert_eq!(is_valid_constant_name(name), true, "{name}");
+        }
+
+        for name in disallowed_names {
+            assert_eq!(is_valid_constant_name(name), false, "{name}");
+        }
+    }
 }
