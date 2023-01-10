@@ -13,6 +13,9 @@ use solang_parser::pt::{
 use std::{error::Error, ffi::OsStr, fs, process};
 use walkdir::{DirEntry, WalkDir};
 
+/// Program configuration. Valid modes are `fmt`, `check`, and `--version`.
+pub mod config;
+
 /// Utilities for formatting and printing a report of results.
 pub mod report;
 
@@ -26,39 +29,6 @@ static RE_VALID_TEST_NAME: Lazy<Regex> = Lazy::new(|| {
 static RE_VALID_CONSTANT_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(?:[$_]*[A-Z][$_]*){1,}$").unwrap());
 
-// ========================
-// ======== Config ========
-// ========================
-
-enum Mode {
-    Format,
-    Check,
-    Version,
-}
-
-/// Program configuration. Valid modes are `fmt`, `check`, and `--version`.
-pub struct Config {
-    mode: Mode,
-}
-
-impl Config {
-    /// Create a new configuration from the command line arguments.
-    /// # Errors
-    /// Errors if too many arguments are provided, or an invalid mode is provided.
-    pub fn build(args: &[String]) -> Result<Self, &'static str> {
-        match args.len() {
-            1 => Ok(Self { mode: Mode::Format }), // Default to format if no args provided.
-            2 => match args[1].as_str() {
-                "fmt" => Ok(Self { mode: Mode::Format }),
-                "check" => Ok(Self { mode: Mode::Check }),
-                "--version" | "-v" => Ok(Self { mode: Mode::Version }),
-                _ => Err("Unrecognized mode: Must be 'fmt', 'check', or '--version'"),
-            },
-            _ => Err("Too many arguments"),
-        }
-    }
-}
-
 // ===========================
 // ======== Execution ========
 // ===========================
@@ -66,7 +36,7 @@ impl Config {
 /// Takes the provided `config` and runs the program.
 /// # Errors
 /// Errors if the provided mode fails to run.
-pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
+pub fn run(config: &config::Config) -> Result<(), Box<dyn Error>> {
     // Configure formatting options, https://taplo.tamasfe.dev/.
     let taplo_opts = taplo::formatter::Options {
         allowed_blank_lines: 1,
@@ -77,9 +47,9 @@ pub fn run(config: &Config) -> Result<(), Box<dyn Error>> {
 
     // Execute commands.
     match config.mode {
-        Mode::Format => fmt(taplo_opts),
-        Mode::Check => check(taplo_opts),
-        Mode::Version => {
+        config::Mode::Format => fmt(taplo_opts),
+        config::Mode::Check => check(taplo_opts),
+        config::Mode::Version => {
             version();
             Ok(())
         }
