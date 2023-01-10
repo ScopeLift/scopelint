@@ -10,8 +10,11 @@ use solang_parser::pt::{
     ContractPart, FunctionAttribute, FunctionDefinition, FunctionTy, SourceUnitPart,
     VariableAttribute, VariableDefinition, Visibility,
 };
-use std::{error::Error, ffi::OsStr, fmt, fs, process};
+use std::{error::Error, ffi::OsStr, fs, process};
 use walkdir::{DirEntry, WalkDir};
+
+/// Utilities for formatting and printing a report of results.
+pub mod report;
 
 // A regex matching valid test names, see the `validate_test_names_regex` test for examples.
 static RE_VALID_TEST_NAME: Lazy<Regex> = Lazy::new(|| {
@@ -163,67 +166,8 @@ fn validate_conventions() -> Result<(), Box<dyn Error>> {
 
 // -------- Validation implementation --------
 
-enum Validator {
-    Constant,
-    Script,
-    Src,
-    Test,
-}
-
-struct InvalidItem {
-    kind: Validator,
-    file: String, // File name.
-    text: String, // Details to show about the invalid item.
-    line: usize,  // Line number.
-}
-
-impl InvalidItem {
-    fn description(&self) -> String {
-        match self.kind {
-            Validator::Test => {
-                format!("Invalid test name in {} on line {}: {}", self.file, self.line, self.text)
-            }
-            Validator::Constant => {
-                format!(
-                    "Invalid constant or immutable name in {} on line {}: {}",
-                    self.file, self.line, self.text
-                )
-            }
-            Validator::Script => {
-                format!("Invalid script interface in {}: {}", self.file, self.text)
-            }
-            Validator::Src => {
-                format!(
-                    "Invalid src method name in {} on line {}: {}",
-                    self.file, self.line, self.text
-                )
-            }
-        }
-    }
-}
-
-#[derive(Default)]
-struct ValidationResults {
-    invalid_items: Vec<InvalidItem>,
-}
-
-impl fmt::Display for ValidationResults {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-        for item in &self.invalid_items {
-            writeln!(f, "{}", item.description())?;
-        }
-        Ok(())
-    }
-}
-
-impl ValidationResults {
-    fn is_valid(&self) -> bool {
-        self.invalid_items.is_empty()
-    }
-}
-
 trait Validate {
-    fn validate(&self, content: &str, dent: &DirEntry) -> Vec<InvalidItem>;
+    fn validate(&self, content: &str, dent: &DirEntry) -> Vec<report::InvalidItem>;
 }
 
 trait Name {
@@ -231,7 +175,7 @@ trait Name {
 }
 
 impl Validate for VariableDefinition {
-    fn validate(&self, content: &str, dent: &DirEntry) -> Vec<InvalidItem> {
+    fn validate(&self, content: &str, dent: &DirEntry) -> Vec<report::InvalidItem> {
         let mut invalid_items = Vec::new();
         let name = &self.name.name;
 
@@ -240,13 +184,14 @@ impl Validate for VariableDefinition {
             .attrs
             .iter()
             .any(|a| matches!(a, VariableAttribute::Constant(_) | VariableAttribute::Immutable(_)));
+
         if is_constant && !is_valid_constant_name(name) {
-            invalid_items.push(InvalidItem {
-                kind: Validator::Constant,
-                file: dent.path().display().to_string(),
-                text: name.clone(),
-                line: offset_to_line(content, self.loc.start()),
-            });
+            invalid_items.push(report::InvalidItem::new(
+                report::Validator::Constant,
+                dent.path().display().to_string(),
+                name.clone(),
+                offset_to_line(content, self.loc.start()),
+            ));
         }
 
         invalid_items
@@ -265,18 +210,18 @@ impl Name for FunctionDefinition {
 }
 
 impl Validate for FunctionDefinition {
-    fn validate(&self, content: &str, dent: &DirEntry) -> Vec<InvalidItem> {
+    fn validate(&self, content: &str, dent: &DirEntry) -> Vec<report::InvalidItem> {
         let mut invalid_items = Vec::new();
         let name = &self.name();
 
         // Validate test names match the required pattern.
         if dent.path().starts_with("./test") && !is_valid_test_name(name) {
-            invalid_items.push(InvalidItem {
-                kind: Validator::Test,
-                file: dent.path().display().to_string(),
-                text: name.to_string(),
-                line: offset_to_line(content, self.loc.start()),
-            });
+            invalid_items.push(report::InvalidItem::new(
+                report::Validator::Test,
+                dent.path().display().to_string(),
+                name.to_string(),
+                offset_to_line(content, self.loc.start()),
+            ));
         }
 
         // Validate internal and private src methods start with an underscore.
@@ -288,21 +233,21 @@ impl Validate for FunctionDefinition {
         });
 
         if dent.path().starts_with("./src") && is_private && !name.starts_with('_') {
-            invalid_items.push(InvalidItem {
-                kind: Validator::Src,
-                file: dent.path().display().to_string(),
-                text: name.to_string(),
-                line: offset_to_line(content, self.loc.start()),
-            });
+            invalid_items.push(report::InvalidItem::new(
+                report::Validator::Src,
+                dent.path().display().to_string(),
+                name.to_string(),
+                offset_to_line(content, self.loc.start()),
+            ));
         }
 
         invalid_items
     }
 }
 
-// Core validation method that walks the filesystem and validates all Solidity files.
-fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
-    let mut results = ValidationResults::default();
+// Core validation method that walks the directory and validates all Solidity files.
+fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
+    let mut results = report::Report::default();
 
     for path in paths {
         for result in WalkDir::new(path) {
@@ -334,19 +279,19 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
             for element in pt.0 {
                 match element {
                     SourceUnitPart::FunctionDefinition(f) => {
-                        results.invalid_items.extend(f.validate(&content, &dent));
+                        results.add_items(f.validate(&content, &dent));
                     }
                     SourceUnitPart::VariableDefinition(v) => {
-                        results.invalid_items.extend(v.validate(&content, &dent));
+                        results.add_items(v.validate(&content, &dent));
                     }
                     SourceUnitPart::ContractDefinition(c) => {
                         for el in c.parts {
                             match el {
                                 ContractPart::VariableDefinition(v) => {
-                                    results.invalid_items.extend(v.validate(&content, &dent));
+                                    results.add_items(v.validate(&content, &dent));
                                 }
                                 ContractPart::FunctionDefinition(f) => {
-                                    results.invalid_items.extend(f.validate(&content, &dent));
+                                    results.add_items(f.validate(&content, &dent));
 
                                     let name = f.name();
                                     let is_private = f.attributes.iter().any(|a| match a {
@@ -381,30 +326,30 @@ fn validate(paths: [&str; 3]) -> Result<ValidationResults, Box<dyn Error>> {
                 // If we have no public methods, the `run` method is missing.
                 match public_methods.len() {
                     0 => {
-                        results.invalid_items.push(InvalidItem {
-                            kind: Validator::Script,
-                            file: dent.path().display().to_string(),
-                            text: "No `run` method found".to_string(),
-                            line: 0, // This spans multiple lines, so we don't have a line number.
-                        });
+                        results.add_item(report::InvalidItem::new(
+                            report::Validator::Script,
+                            dent.path().display().to_string(),
+                            "No `run` method found".to_string(),
+                            0, // This spans multiple lines, so we don't have a line number.
+                        ));
                     }
                     1 => {
                         if public_methods[0] != "run" {
-                            results.invalid_items.push(InvalidItem {
-                                kind: Validator::Script,
-                                file: dent.path().display().to_string(),
-                                text: "The only public method must be named `run`".to_string(),
-                                line: 0,
-                            });
+                            results.add_item(report::InvalidItem::new(
+                                report::Validator::Script,
+                                dent.path().display().to_string(),
+                                "The only public method must be named `run`".to_string(),
+                                0,
+                            ));
                         }
                     }
                     _ => {
-                        results.invalid_items.push(InvalidItem {
-                            kind: Validator::Script,
-                            file: dent.path().display().to_string(),
-                            text: format!("Scripts must have a single public method named `run` (excluding `setUp`), but the following methods were found: {public_methods:?}"),
-                            line: 0,
-                        });
+                        results.add_item(report::InvalidItem::new(
+                            report::Validator::Script,
+                            dent.path().display().to_string(),
+                            format!("Scripts must have a single public method named `run` (excluding `setUp`), but the following methods were found: {public_methods:?}"),
+                            0,
+                        ));
                     }
                 }
             }
@@ -446,7 +391,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn validate_test_name_regex() {
+    fn validate_test_names_regex() {
         let allowed_names = vec![
             "test_Description",
             "testFuzz_Description",
@@ -494,7 +439,7 @@ mod tests {
     }
 
     #[test]
-    fn validate_constant_name_regex() {
+    fn validate_constant_names_regex() {
         let allowed_names = vec![
             "VARIABLE",
             "VARIABLE_NAME",
