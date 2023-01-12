@@ -10,8 +10,8 @@ use solang_parser::pt::{
     ContractPart, FunctionAttribute, FunctionDefinition, FunctionTy, SourceUnitPart,
     VariableAttribute, VariableDefinition, Visibility,
 };
-use std::{error::Error, ffi::OsStr, fs, process};
-use walkdir::{DirEntry, WalkDir};
+use std::{error::Error, ffi::OsStr, fs, path::Path, process};
+use walkdir::WalkDir;
 
 /// Program configuration. Valid modes are `fmt`, `check`, and `--version`.
 pub mod config;
@@ -137,7 +137,7 @@ fn validate_conventions() -> Result<(), Box<dyn Error>> {
 // -------- Validation implementation --------
 
 trait Validate {
-    fn validate(&self, content: &str, dent: &DirEntry) -> Vec<report::InvalidItem>;
+    fn validate(&self, content: &str, file: &Path) -> Vec<report::InvalidItem>;
 }
 
 trait Name {
@@ -145,7 +145,7 @@ trait Name {
 }
 
 impl Validate for VariableDefinition {
-    fn validate(&self, content: &str, dent: &DirEntry) -> Vec<report::InvalidItem> {
+    fn validate(&self, content: &str, file: &Path) -> Vec<report::InvalidItem> {
         let mut invalid_items = Vec::new();
         let name = &self.name.name;
 
@@ -158,7 +158,7 @@ impl Validate for VariableDefinition {
         if is_constant && !is_valid_constant_name(name) {
             invalid_items.push(report::InvalidItem::new(
                 report::Validator::Constant,
-                dent.path().display().to_string(),
+                file.display().to_string(),
                 name.clone(),
                 offset_to_line(content, self.loc.start()),
             ));
@@ -180,15 +180,15 @@ impl Name for FunctionDefinition {
 }
 
 impl Validate for FunctionDefinition {
-    fn validate(&self, content: &str, dent: &DirEntry) -> Vec<report::InvalidItem> {
+    fn validate(&self, content: &str, file: &Path) -> Vec<report::InvalidItem> {
         let mut invalid_items = Vec::new();
         let name = &self.name();
 
         // Validate test names match the required pattern.
-        if dent.path().starts_with("./test") && !is_valid_test_name(name) {
+        if file.starts_with("./test") && !is_valid_test_name(name) {
             invalid_items.push(report::InvalidItem::new(
                 report::Validator::Test,
-                dent.path().display().to_string(),
+                file.display().to_string(),
                 name.to_string(),
                 offset_to_line(content, self.loc.start()),
             ));
@@ -202,10 +202,10 @@ impl Validate for FunctionDefinition {
             _ => false,
         });
 
-        if dent.path().starts_with("./src") && is_private && !name.starts_with('_') {
+        if file.starts_with("./src") && is_private && !name.starts_with('_') {
             invalid_items.push(report::InvalidItem::new(
                 report::Validator::Src,
-                dent.path().display().to_string(),
+                file.display().to_string(),
                 name.to_string(),
                 offset_to_line(content, self.loc.start()),
             ));
@@ -249,19 +249,19 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
             for element in pt.0 {
                 match element {
                     SourceUnitPart::FunctionDefinition(f) => {
-                        results.add_items(f.validate(&content, &dent));
+                        results.add_items(f.validate(&content, dent.path()));
                     }
                     SourceUnitPart::VariableDefinition(v) => {
-                        results.add_items(v.validate(&content, &dent));
+                        results.add_items(v.validate(&content, dent.path()));
                     }
                     SourceUnitPart::ContractDefinition(c) => {
                         for el in c.parts {
                             match el {
                                 ContractPart::VariableDefinition(v) => {
-                                    results.add_items(v.validate(&content, &dent));
+                                    results.add_items(v.validate(&content, dent.path()));
                                 }
                                 ContractPart::FunctionDefinition(f) => {
-                                    results.add_items(f.validate(&content, &dent));
+                                    results.add_items(f.validate(&content, dent.path()));
 
                                     let name = f.name();
                                     let is_private = f.attributes.iter().any(|a| match a {
