@@ -1,6 +1,7 @@
 use std::fmt;
 
 /// The type of validator that found the invalid item.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum Validator {
     /// A constant or immutable variable.
     Constant,
@@ -13,6 +14,7 @@ pub enum Validator {
 }
 
 /// A single invalid item found by a validator.
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct InvalidItem {
     kind: Validator,
     file: String, // File name.
@@ -60,7 +62,10 @@ pub struct Report {
 
 impl fmt::Display for Report {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-        for item in &self.invalid_items {
+        let mut sorted_items = self.invalid_items.clone();
+        sorted_items.sort();
+
+        for item in sorted_items {
             writeln!(f, "{}", item.description())?;
         }
         Ok(())
