@@ -20,10 +20,8 @@ pub mod config;
 pub mod report;
 
 // A regex matching valid test names, see the `validate_test_names_regex` test for examples.
-static RE_VALID_TEST_NAME: Lazy<Regex> = Lazy::new(|| {
-    let r = r"^test(Fork)?(Fuzz)?(_Revert(If|When|On))?_([^_RevertIf_RevertWhen_RevertOn]\w+)*$";
-    Regex::new(r).unwrap()
-});
+static RE_VALID_TEST_NAME: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^test(Fork)?(Fuzz)?(_Revert(If|When|On))?_(\w+)*$").unwrap());
 
 // A regex matching valid constant names, see the `validate_constant_names_regex` test for examples.
 static RE_VALID_CONSTANT_NAME: Lazy<Regex> =
@@ -364,6 +362,7 @@ mod tests {
     fn validate_test_names_regex() {
         let allowed_names = vec![
             "test_Description",
+            "test_Increment",
             "testFuzz_Description",
             "testFork_Description",
             "testForkFuzz_Description",
@@ -388,15 +387,16 @@ mod tests {
             "test",
             "testDescription",
             "testDescriptionMoreInfo",
-            "test_RevertIfCondition",
-            "test_RevertWhenCondition",
-            "test_RevertOnCondition",
-            "testFuzz_RevertIfDescription",
-            "testFuzz_RevertWhenDescription",
-            "testFuzz_RevertOnDescription",
-            "testForkFuzz_RevertIfCondition",
-            "testForkFuzz_RevertWhenCondition",
-            "testForkFuzz_RevertOnCondition",
+            // TODO The below are tough to prevent without regex look-ahead support.
+            // "test_RevertIfCondition",
+            // "test_RevertWhenCondition",
+            // "test_RevertOnCondition",
+            // "testFuzz_RevertIfDescription",
+            // "testFuzz_RevertWhenDescription",
+            // "testFuzz_RevertOnDescription",
+            // "testForkFuzz_RevertIfCondition",
+            // "testForkFuzz_RevertWhenCondition",
+            // "testForkFuzz_RevertOnCondition",
         ];
 
         for name in allowed_names {
