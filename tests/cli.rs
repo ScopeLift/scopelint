@@ -40,15 +40,12 @@ fn test_check_proj1_all_findings() {
         "",
     ];
 
-    println!("DEBUG: log all findings to see if order of findings varies");
-    for finding in findings.iter() {
-        println!("{}", *finding);
-    }
-
     for (i, expected) in expected_findings.iter().enumerate() {
         assert_eq!(findings[i], *expected);
     }
+    assert_eq!(findings.len(), expected_findings.len());
 }
+
 #[test]
 fn test_check_proj2_no_findings() {
     let output = run_scopelint("proj2-NoFindings");
@@ -60,4 +57,5 @@ fn test_check_proj2_no_findings() {
     for (i, expected) in expected_findings.iter().enumerate() {
         assert_eq!(findings[i], *expected);
     }
+    assert_eq!(findings.len(), expected_findings.len());
 }
