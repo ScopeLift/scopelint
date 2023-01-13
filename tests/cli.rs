@@ -18,7 +18,7 @@ fn run_scopelint(test_folder: &str) -> Output {
 }
 
 #[test]
-fn test_check_proj1() {
+fn test_check_proj1_all_findings() {
     let output = run_scopelint("proj1-AllFindings");
     let stderr = String::from_utf8(output.stderr).unwrap();
     let findings: Vec<&str> = stderr.split("\n").collect();
@@ -36,10 +36,21 @@ fn test_check_proj1() {
         r#"Invalid script interface in ./script/Counter.s.sol: Scripts must have a single public method named `run` (excluding `setUp`), but the following methods were found: ["run", "runExternal"]"#,
         "Invalid constant or immutable name in ./test/Counter.t.sol on line 7: testVal",
         "Invalid test name in ./test/Counter.t.sol on line 16: testIncrementBadName",
-        "Invalid test name in ./test/Counter.t.sol on line 26: test_RevertIf_Overflow",
         "error: Convention checks failed, see details above",
         ""
     ];
+
+    for (i, expected) in expected_findings.iter().enumerate() {
+        assert_eq!(findings[i], *expected);
+    }
+}
+#[test]
+fn test_check_proj2_no_findings() {
+    let output = run_scopelint("proj2-NoFindings");
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let findings: Vec<&str> = stderr.split("\n").collect();
+
+    let expected_findings = [""];
 
     for (i, expected) in expected_findings.iter().enumerate() {
         assert_eq!(findings[i], *expected);
