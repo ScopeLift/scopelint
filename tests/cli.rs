@@ -9,8 +9,9 @@ use std::{
 fn run_scopelint(test_folder: &str) -> Output {
     let cwd = env::current_dir().unwrap();
     let project_path = cwd.join("tests").join(test_folder);
+    let binary_path = cwd.join("target/debug/scopelint");
 
-    Command::new("../../target/debug/scopelint")
+    Command::new(binary_path)
         .current_dir(project_path)
         .arg("check")
         .output()
