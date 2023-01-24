@@ -7,7 +7,7 @@ use std::{env, process};
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    let config = scopelint::Config::build(&args).unwrap_or_else(|err| {
+    let config = scopelint::config::Config::build(&args).unwrap_or_else(|err| {
         eprintln!("{}: Argument parsing failed with '{err}'", "error".bold().red());
         process::exit(1);
     });
