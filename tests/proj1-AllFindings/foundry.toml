@@ -4,6 +4,7 @@
   line_length = 100
   multiline_func_header = "attributes_first"
   number_underscore = "thousands"
+  override_spacing = false
   quote_style = "double"
   single_line_statement_blocks = "single"
   tab_width = 2
