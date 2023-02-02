@@ -25,7 +25,7 @@ static RE_VALID_TEST_NAME: Lazy<Regex> =
 
 // A regex matching valid constant names, see the `validate_constant_names_regex` test for examples.
 static RE_VALID_CONSTANT_NAME: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(?:[$_]*[A-Z][$_]*){1,}$").unwrap());
+    Lazy::new(|| Regex::new(r"^(?:[$_]*[A-Z0-9][$_]*){1,}$").unwrap());
 
 // ===========================
 // ======== Execution ========
@@ -411,6 +411,9 @@ mod tests {
     #[test]
     fn validate_constant_names_regex() {
         let allowed_names = vec![
+            "MAX_UINT256",
+            "256_MAXUINT",
+            "256_MAX_11_UINT",
             "VARIABLE",
             "VARIABLE_NAME",
             "VARIABLE_NAME_",
