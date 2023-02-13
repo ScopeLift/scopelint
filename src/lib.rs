@@ -16,8 +16,14 @@ use walkdir::WalkDir;
 /// Program configuration. Valid modes are `fmt`, `check`, and `--version`.
 pub mod config;
 
+/// Formats the codebase.
+pub mod fmt;
+
 /// Utilities for formatting and printing a report of results.
 pub mod report;
+
+/// Logs the current package version.
+pub mod version;
 
 // A regex matching valid test names, see the `validate_test_names_regex` test for examples.
 static RE_VALID_TEST_NAME: Lazy<Regex> =
@@ -45,37 +51,13 @@ pub fn run(config: &config::Config) -> Result<(), Box<dyn Error>> {
 
     // Execute commands.
     match config.mode {
-        config::Mode::Format => fmt(taplo_opts),
+        config::Mode::Format => fmt::run(taplo_opts),
         config::Mode::Check => check(taplo_opts),
         config::Mode::Version => {
-            version();
+            version::run();
             Ok(())
         }
     }
-}
-
-// Print the package version.
-fn version() {
-    println!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
-}
-
-// Format the code, and print details on any invalid items.
-fn fmt(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
-    // Format Solidity with forge
-    let forge_status = process::Command::new("forge").arg("fmt").output()?;
-
-    // Print any warnings/errors from `forge fmt`.
-    if !forge_status.stderr.is_empty() {
-        print!("{}", String::from_utf8(forge_status.stderr)?);
-    }
-
-    // Format `foundry.toml` with taplo.
-    let config_orig = fs::read_to_string("./foundry.toml")?;
-    let config_fmt = taplo::formatter::format(&config_orig, taplo_opts);
-    fs::write("./foundry.toml", config_fmt)?;
-
-    // Check naming conventions.
-    validate_conventions()
 }
 
 // Validate the code formatting, and print details on any invalid items.
