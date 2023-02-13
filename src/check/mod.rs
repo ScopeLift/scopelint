@@ -1,6 +1,5 @@
 use colored::Colorize;
 use once_cell::sync::Lazy;
-
 use regex::Regex;
 use solang_parser::pt::{
     ContractPart, FunctionAttribute, FunctionDefinition, FunctionTy, SourceUnitPart,
@@ -9,8 +8,9 @@ use solang_parser::pt::{
 use std::{error::Error, ffi::OsStr, fs, path::Path};
 use walkdir::WalkDir;
 
-pub mod check_formatting;
+pub mod checks;
 pub mod report;
+pub mod utils;
 
 // A regex matching valid test names, see the `validate_test_names_regex` test for examples.
 static RE_VALID_TEST_NAME: Lazy<Regex> =
@@ -25,7 +25,7 @@ static RE_VALID_CONSTANT_NAME: Lazy<Regex> =
 /// TODO
 pub fn run(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     let valid_names = validate_conventions();
-    let valid_fmt = check_formatting::run(taplo_opts);
+    let valid_fmt = checks::formatting::run(taplo_opts);
 
     if valid_names.is_ok() && valid_fmt.is_ok() {
         Ok(())
@@ -277,56 +277,6 @@ fn offset_to_line(content: &str, start: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn validate_test_names_regex() {
-        let allowed_names = vec![
-            "test_Description",
-            "test_Increment",
-            "testFuzz_Description",
-            "testFork_Description",
-            "testForkFuzz_Description",
-            "testForkFuzz_Description_MoreInfo",
-            "test_RevertIf_Condition",
-            "test_RevertWhen_Condition",
-            "test_RevertOn_Condition",
-            "test_RevertOn_Condition_MoreInfo",
-            "testFuzz_RevertIf_Condition",
-            "testFuzz_RevertWhen_Condition",
-            "testFuzz_RevertOn_Condition",
-            "testFuzz_RevertOn_Condition_MoreInfo",
-            "testForkFuzz_RevertIf_Condition",
-            "testForkFuzz_RevertWhen_Condition",
-            "testForkFuzz_RevertOn_Condition",
-            "testForkFuzz_RevertOn_Condition_MoreInfo",
-            "testForkFuzz_RevertOn_Condition_MoreInfo_Wow",
-            "testForkFuzz_RevertOn_Condition_MoreInfo_Wow_As_Many_Underscores_As_You_Want",
-        ];
-
-        let disallowed_names = [
-            "test",
-            "testDescription",
-            "testDescriptionMoreInfo",
-            // TODO The below are tough to prevent without regex look-ahead support.
-            // "test_RevertIfCondition",
-            // "test_RevertWhenCondition",
-            // "test_RevertOnCondition",
-            // "testFuzz_RevertIfDescription",
-            // "testFuzz_RevertWhenDescription",
-            // "testFuzz_RevertOnDescription",
-            // "testForkFuzz_RevertIfCondition",
-            // "testForkFuzz_RevertWhenCondition",
-            // "testForkFuzz_RevertOnCondition",
-        ];
-
-        for name in allowed_names {
-            assert_eq!(is_valid_test_name(name), true, "{name}");
-        }
-
-        for name in disallowed_names {
-            assert_eq!(is_valid_test_name(name), false, "{name}");
-        }
-    }
 
     #[test]
     fn validate_constant_names_regex() {
