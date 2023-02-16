@@ -1,57 +1,57 @@
 use crate::check::{
-    report, utils,
-    utils::{Name, Validate},
+    report::{InvalidItem, Validator},
+    utils::{self, FileKind, IsFileKind, Name},
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
-use solang_parser::pt::{ContractPart, FunctionDefinition, SourceUnitPart};
-use std::{error::Error, fs, path::Path};
+use solang_parser::pt::{ContractPart, SourceUnit, SourceUnitPart};
+use std::{error::Error, path::Path};
 
 // A regex matching valid test names, see the `validate_test_names_regex` test for examples.
 static RE_VALID_TEST_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^test(Fork)?(Fuzz)?(_Revert(If|When|On))?_(\w+)*$").unwrap());
 
-impl utils::Validate for FunctionDefinition {
-    fn validate(&self, content: &str, file: &Path) -> Option<report::InvalidItem> {
-        let name = &self.name();
-
-        if file.starts_with("./test") && !is_valid_test_name(name) {
-            return Some(report::InvalidItem::new(
-                report::Validator::Test,
-                file.display().to_string(),
-                name.to_string(),
-                utils::offset_to_line(content, self.loc.start()),
-            ))
-        }
-        None
+pub fn validate(
+    file: &Path,
+    content: &str,
+    pt: &SourceUnit,
+) -> Result<Vec<InvalidItem>, Box<dyn Error>> {
+    if !file.is_file_kind(FileKind::TestContracts) {
+        return Ok(Vec::new())
     }
-}
 
-pub fn run() -> Result<Vec<report::InvalidItem>, Box<dyn Error>> {
-    let mut invalid_items = Vec::new();
-
-    let files = utils::get_files(&utils::FileKind::TestContracts)?;
-    for file in files {
-        let content = fs::read_to_string(&file)?;
-        let (pt, _comments) = solang_parser::parse(&content, 0).expect("Parsing failed");
-        // Run checks.
-        for element in pt.0 {
-            match element {
-                SourceUnitPart::FunctionDefinition(f) => {
-                    invalid_items.extend(f.validate(&content, &file));
+    let mut invalid_items: Vec<InvalidItem> = Vec::new();
+    for element in &pt.0 {
+        match element {
+            SourceUnitPart::FunctionDefinition(f) => {
+                let name = f.name();
+                if !is_valid_test_name(&name) {
+                    invalid_items.push(InvalidItem::new(
+                        Validator::Test,
+                        file.display().to_string(),
+                        name.to_string(),
+                        utils::offset_to_line(content, f.loc.start()),
+                    ));
                 }
-                SourceUnitPart::ContractDefinition(c) => {
-                    for el in c.parts {
-                        if let ContractPart::FunctionDefinition(f) = el {
-                            invalid_items.extend(f.validate(&content, &file));
+            }
+            SourceUnitPart::ContractDefinition(c) => {
+                for el in &c.parts {
+                    if let ContractPart::FunctionDefinition(f) = el {
+                        let name = f.name();
+                        if !is_valid_test_name(&name) {
+                            invalid_items.push(InvalidItem::new(
+                                Validator::Test,
+                                file.display().to_string(),
+                                name.to_string(),
+                                utils::offset_to_line(content, f.loc.start()),
+                            ));
                         }
                     }
                 }
-                _ => (),
             }
+            _ => (),
         }
     }
-
     Ok(invalid_items)
 }
 

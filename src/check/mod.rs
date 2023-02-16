@@ -12,10 +12,6 @@ pub mod checks;
 pub mod report;
 pub mod utils;
 
-// A regex matching valid test names, see the `validate_test_names_regex` test for examples.
-static RE_VALID_TEST_NAME: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^test(Fork)?(Fuzz)?(_Revert(If|When|On))?_(\w+)*$").unwrap());
-
 // A regex matching valid constant names, see the `validate_constant_names_regex` test for examples.
 static RE_VALID_CONSTANT_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(?:[$_]*[A-Z0-9][$_]*){1,}$").unwrap());
@@ -102,16 +98,6 @@ impl Validate for FunctionDefinition {
         let mut invalid_items = Vec::new();
         let name = &self.name();
 
-        // Validate test names match the required pattern.
-        if file.starts_with("./test") && !is_valid_test_name(name) {
-            invalid_items.push(report::InvalidItem::new(
-                report::Validator::Test,
-                file.display().to_string(),
-                name.to_string(),
-                offset_to_line(content, self.loc.start()),
-            ));
-        }
-
         // Validate internal and private src methods start with an underscore.
         let is_private = self.attributes.iter().any(|a| match a {
             FunctionAttribute::Visibility(v) => {
@@ -159,6 +145,8 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
             // Get the parse tree (pt) of the file.
             let content = fs::read_to_string(dent.path())?;
             let (pt, _comments) = solang_parser::parse(&content, 0).expect("Parsing failed");
+
+            results.add_items(checks::test_names::validate(dent.path(), &content, &pt)?);
 
             // Variables used to track status of checks that are file-wide.
             let mut public_methods: Vec<String> = Vec::new();
@@ -244,13 +232,6 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
         }
     }
     Ok(results)
-}
-
-fn is_valid_test_name(name: &str) -> bool {
-    if !name.starts_with("test") {
-        return true // Not a test function, so return.
-    }
-    RE_VALID_TEST_NAME.is_match(name)
 }
 
 fn is_valid_constant_name(name: &str) -> bool {
