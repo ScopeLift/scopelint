@@ -1,8 +1,7 @@
-use crate::check::{
-    report::{InvalidItem, Validator},
-    utils::{offset_to_line, FileKind, IsFileKind, Name, VisibilitySummary},
+use crate::check::utils::{
+    offset_to_line, FileKind, InvalidItem, IsFileKind, Name, Validator, VisibilitySummary,
 };
-use solang_parser::pt::{ContractPart, SourceUnit, SourceUnitPart};
+use solang_parser::pt::{ContractPart, FunctionDefinition, SourceUnit, SourceUnitPart};
 use std::{error::Error, path::Path};
 
 pub fn validate(
@@ -18,27 +17,15 @@ pub fn validate(
     for element in &pt.0 {
         match element {
             SourceUnitPart::FunctionDefinition(f) => {
-                let name = f.name();
-                if f.is_internal_or_private() && !is_valid_internal_or_private_name(&name) {
-                    invalid_items.push(InvalidItem::new(
-                        Validator::Src,
-                        file.display().to_string(),
-                        name.to_string(),
-                        offset_to_line(content, f.loc.start()),
-                    ));
+                if let Some(invalid_item) = validate_name(file, content, f) {
+                    invalid_items.push(invalid_item);
                 }
             }
             SourceUnitPart::ContractDefinition(c) => {
                 for el in &c.parts {
                     if let ContractPart::FunctionDefinition(f) = el {
-                        let name = f.name();
-                        if f.is_internal_or_private() && !is_valid_internal_or_private_name(&name) {
-                            invalid_items.push(InvalidItem::new(
-                                Validator::Src,
-                                file.display().to_string(),
-                                name.to_string(),
-                                offset_to_line(content, f.loc.start()),
-                            ));
+                        if let Some(invalid_item) = validate_name(file, content, f) {
+                            invalid_items.push(invalid_item);
                         }
                     }
                 }
@@ -51,4 +38,18 @@ pub fn validate(
 
 fn is_valid_internal_or_private_name(name: &str) -> bool {
     name.starts_with('_')
+}
+
+fn validate_name(file: &Path, content: &str, f: &FunctionDefinition) -> Option<InvalidItem> {
+    let name = f.name();
+    if f.is_internal_or_private() && !is_valid_internal_or_private_name(&name) {
+        Some(InvalidItem::new(
+            Validator::Src,
+            file.display().to_string(),
+            name,
+            offset_to_line(content, f.loc.start()),
+        ))
+    } else {
+        None
+    }
 }

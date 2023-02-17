@@ -1,10 +1,7 @@
-use crate::check::{
-    report::{InvalidItem, Validator},
-    utils::{offset_to_line, FileKind, IsFileKind, Name},
-};
+use crate::check::utils::{offset_to_line, FileKind, InvalidItem, IsFileKind, Name, Validator};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use solang_parser::pt::{ContractPart, SourceUnit, SourceUnitPart};
+use solang_parser::pt::{ContractPart, FunctionDefinition, SourceUnit, SourceUnitPart};
 use std::{error::Error, path::Path};
 
 // A regex matching valid test names, see the `validate_test_names_regex` test for examples.
@@ -24,27 +21,15 @@ pub fn validate(
     for element in &pt.0 {
         match element {
             SourceUnitPart::FunctionDefinition(f) => {
-                let name = f.name();
-                if !is_valid_test_name(&name) {
-                    invalid_items.push(InvalidItem::new(
-                        Validator::Test,
-                        file.display().to_string(),
-                        name.to_string(),
-                        offset_to_line(content, f.loc.start()),
-                    ));
+                if let Some(invalid_item) = validate_name(file, content, f) {
+                    invalid_items.push(invalid_item);
                 }
             }
             SourceUnitPart::ContractDefinition(c) => {
                 for el in &c.parts {
                     if let ContractPart::FunctionDefinition(f) = el {
-                        let name = f.name();
-                        if !is_valid_test_name(&name) {
-                            invalid_items.push(InvalidItem::new(
-                                Validator::Test,
-                                file.display().to_string(),
-                                name.to_string(),
-                                offset_to_line(content, f.loc.start()),
-                            ));
+                        if let Some(invalid_item) = validate_name(file, content, f) {
+                            invalid_items.push(invalid_item);
                         }
                     }
                 }
@@ -60,6 +45,20 @@ fn is_valid_test_name(name: &str) -> bool {
         return true // Not a test function, so return true and skip this check.
     }
     name.starts_with("test") && RE_VALID_TEST_NAME.is_match(name)
+}
+
+fn validate_name(file: &Path, content: &str, f: &FunctionDefinition) -> Option<InvalidItem> {
+    let name = f.name();
+    if !is_valid_test_name(&name) {
+        Some(InvalidItem::new(
+            Validator::Test,
+            file.display().to_string(),
+            name,
+            offset_to_line(content, f.loc.start()),
+        ))
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

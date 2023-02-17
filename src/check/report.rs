@@ -1,57 +1,5 @@
+use super::utils::InvalidItem;
 use std::fmt;
-
-/// The type of validator that found the invalid item.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub enum Validator {
-    /// A constant or immutable variable.
-    Constant,
-    /// A script file.
-    Script,
-    /// A source contract.
-    Src,
-    /// A test contract.
-    Test,
-}
-
-/// A single invalid item found by a validator.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub struct InvalidItem {
-    kind: Validator,
-    file: String, // File name.
-    text: String, // Details to show about the invalid item.
-    line: usize,  // Line number.
-}
-
-impl InvalidItem {
-    /// Initializes a new `InvalidItem`.
-    #[must_use]
-    pub const fn new(kind: Validator, file: String, text: String, line: usize) -> Self {
-        Self { kind, file, text, line }
-    }
-
-    fn description(&self) -> String {
-        match self.kind {
-            Validator::Test => {
-                format!("Invalid test name in {} on line {}: {}", self.file, self.line, self.text)
-            }
-            Validator::Constant => {
-                format!(
-                    "Invalid constant or immutable name in {} on line {}: {}",
-                    self.file, self.line, self.text
-                )
-            }
-            Validator::Script => {
-                format!("Invalid script interface in {}: {}", self.file, self.text)
-            }
-            Validator::Src => {
-                format!(
-                    "Invalid src method name in {} on line {}: {}",
-                    self.file, self.line, self.text
-                )
-            }
-        }
-    }
-}
 
 /// A collection of invalid items to generate a report from.
 #[derive(Default)]

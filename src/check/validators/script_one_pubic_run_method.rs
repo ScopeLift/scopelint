@@ -1,7 +1,4 @@
-use crate::check::{
-    report::{InvalidItem, Validator},
-    utils::{FileKind, IsFileKind, Name, VisibilitySummary},
-};
+use crate::check::utils::{FileKind, InvalidItem, IsFileKind, Name, Validator, VisibilitySummary};
 use solang_parser::pt::{ContractPart, SourceUnit, SourceUnitPart};
 use std::{error::Error, path::Path};
 

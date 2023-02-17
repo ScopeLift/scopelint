@@ -1,10 +1,9 @@
-use crate::check::{
-    report::{InvalidItem, Validator},
-    utils::offset_to_line,
-};
+use crate::check::utils::{offset_to_line, InvalidItem, Validator};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use solang_parser::pt::{ContractPart, SourceUnit, SourceUnitPart, VariableAttribute};
+use solang_parser::pt::{
+    ContractPart, SourceUnit, SourceUnitPart, VariableAttribute, VariableDefinition,
+};
 use std::{error::Error, path::Path};
 
 // A regex matching valid constant names, see the `validate_constant_names_regex` test for examples.
@@ -20,38 +19,15 @@ pub fn validate(
     for element in &pt.0 {
         match element {
             SourceUnitPart::VariableDefinition(v) => {
-                let is_constant = v.attrs.iter().any(|a| {
-                    matches!(a, VariableAttribute::Constant(_) | VariableAttribute::Immutable(_))
-                });
-
-                let name = &v.name.name;
-                if is_constant && !is_valid_constant_name(name) {
-                    invalid_items.push(InvalidItem::new(
-                        Validator::Constant,
-                        file.display().to_string(),
-                        name.clone(),
-                        offset_to_line(content, v.loc.start()),
-                    ));
+                if let Some(invalid_item) = validate_name(file, content, v) {
+                    invalid_items.push(invalid_item);
                 }
             }
             SourceUnitPart::ContractDefinition(c) => {
                 for el in &c.parts {
                     if let ContractPart::VariableDefinition(v) = el {
-                        let is_constant = v.attrs.iter().any(|a| {
-                            matches!(
-                                a,
-                                VariableAttribute::Constant(_) | VariableAttribute::Immutable(_)
-                            )
-                        });
-
-                        let name = &v.name.name;
-                        if is_constant && !is_valid_constant_name(name) {
-                            invalid_items.push(InvalidItem::new(
-                                Validator::Constant,
-                                file.display().to_string(),
-                                name.clone(),
-                                offset_to_line(content, v.loc.start()),
-                            ));
+                        if let Some(invalid_item) = validate_name(file, content, v) {
+                            invalid_items.push(invalid_item);
                         }
                     }
                 }
@@ -64,6 +40,25 @@ pub fn validate(
 
 fn is_valid_constant_name(name: &str) -> bool {
     RE_VALID_CONSTANT_NAME.is_match(name)
+}
+
+fn validate_name(file: &Path, content: &str, v: &VariableDefinition) -> Option<InvalidItem> {
+    let is_constant = v
+        .attrs
+        .iter()
+        .any(|a| matches!(a, VariableAttribute::Constant(_) | VariableAttribute::Immutable(_)));
+    let name = &v.name.name;
+
+    if is_constant && !is_valid_constant_name(name) {
+        Some(InvalidItem::new(
+            Validator::Constant,
+            file.display().to_string(),
+            name.clone(),
+            offset_to_line(content, v.loc.start()),
+        ))
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
