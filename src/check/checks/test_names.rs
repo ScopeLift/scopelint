@@ -1,6 +1,6 @@
 use crate::check::{
     report::{InvalidItem, Validator},
-    utils::{self, FileKind, IsFileKind, Name},
+    utils::{offset_to_line, FileKind, IsFileKind, Name},
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -30,7 +30,7 @@ pub fn validate(
                         Validator::Test,
                         file.display().to_string(),
                         name.to_string(),
-                        utils::offset_to_line(content, f.loc.start()),
+                        offset_to_line(content, f.loc.start()),
                     ));
                 }
             }
@@ -43,7 +43,7 @@ pub fn validate(
                                 Validator::Test,
                                 file.display().to_string(),
                                 name.to_string(),
-                                utils::offset_to_line(content, f.loc.start()),
+                                offset_to_line(content, f.loc.start()),
                             ));
                         }
                     }
@@ -57,9 +57,9 @@ pub fn validate(
 
 fn is_valid_test_name(name: &str) -> bool {
     if !name.starts_with("test") {
-        return true // Not a test function, so return.
+        return true // Not a test function, so return true and skip this check.
     }
-    RE_VALID_TEST_NAME.is_match(name)
+    name.starts_with("test") && RE_VALID_TEST_NAME.is_match(name)
 }
 
 #[cfg(test)]

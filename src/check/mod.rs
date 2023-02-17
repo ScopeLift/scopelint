@@ -93,32 +93,6 @@ impl Name for FunctionDefinition {
     }
 }
 
-impl Validate for FunctionDefinition {
-    fn validate(&self, content: &str, file: &Path) -> Vec<report::InvalidItem> {
-        let mut invalid_items = Vec::new();
-        let name = &self.name();
-
-        // Validate internal and private src methods start with an underscore.
-        let is_private = self.attributes.iter().any(|a| match a {
-            FunctionAttribute::Visibility(v) => {
-                matches!(v, Visibility::Private(_) | Visibility::Internal(_))
-            }
-            _ => false,
-        });
-
-        if file.starts_with("./src") && is_private && !name.starts_with('_') {
-            invalid_items.push(report::InvalidItem::new(
-                report::Validator::Src,
-                file.display().to_string(),
-                name.to_string(),
-                offset_to_line(content, self.loc.start()),
-            ));
-        }
-
-        invalid_items
-    }
-}
-
 // Core validation method that walks the directory and validates all Solidity files.
 fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
     let mut results = report::Report::default();
@@ -147,6 +121,7 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
             let (pt, _comments) = solang_parser::parse(&content, 0).expect("Parsing failed");
 
             results.add_items(checks::test_names::validate(dent.path(), &content, &pt)?);
+            results.add_items(checks::src_names_internal::validate(dent.path(), &content, &pt)?);
 
             // Variables used to track status of checks that are file-wide.
             let mut public_methods: Vec<String> = Vec::new();
@@ -154,9 +129,6 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
             // Run checks.
             for element in pt.0 {
                 match element {
-                    SourceUnitPart::FunctionDefinition(f) => {
-                        results.add_items(f.validate(&content, dent.path()));
-                    }
                     SourceUnitPart::VariableDefinition(v) => {
                         results.add_items(v.validate(&content, dent.path()));
                     }
@@ -167,8 +139,6 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
                                     results.add_items(v.validate(&content, dent.path()));
                                 }
                                 ContractPart::FunctionDefinition(f) => {
-                                    results.add_items(f.validate(&content, dent.path()));
-
                                     let name = f.name();
                                     let is_private = f.attributes.iter().any(|a| match a {
                                         FunctionAttribute::Visibility(v) => {

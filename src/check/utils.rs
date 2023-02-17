@@ -3,6 +3,7 @@ use solang_parser::pt::{FunctionDefinition, FunctionTy};
 use std::path::Path;
 
 pub enum FileKind {
+    SrcContracts,
     TestContracts,
 }
 
@@ -12,8 +13,10 @@ pub trait IsFileKind {
 
 impl IsFileKind for Path {
     fn is_file_kind(&self, kind: FileKind) -> bool {
+        let path = self.to_str().unwrap();
         match kind {
-            FileKind::TestContracts => self.to_str().unwrap().ends_with(".t.sol"),
+            FileKind::SrcContracts => path.starts_with("./src") && path.ends_with(".sol"),
+            FileKind::TestContracts => path.starts_with("./test") && path.ends_with(".t.sol"),
         }
     }
 }
