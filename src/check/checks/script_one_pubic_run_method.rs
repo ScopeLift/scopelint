@@ -1,10 +1,8 @@
 use crate::check::{
     report::{InvalidItem, Validator},
-    utils::{FileKind, IsFileKind, Name},
+    utils::{FileKind, IsFileKind, Name, VisibilitySummary},
 };
-use solang_parser::pt::{
-    ContractPart, FunctionAttribute, FunctionDefinition, SourceUnit, SourceUnitPart, Visibility,
-};
+use solang_parser::pt::{ContractPart, SourceUnit, SourceUnitPart};
 use std::{error::Error, path::Path};
 
 pub fn validate(
@@ -22,7 +20,7 @@ pub fn validate(
             for el in &c.parts {
                 if let ContractPart::FunctionDefinition(f) = el {
                     let name = f.name();
-                    if !is_private(f) && name != "setUp" && name != "constructor" {
+                    if f.is_public_or_external() && name != "setUp" && name != "constructor" {
                         public_methods.push(name);
                     }
                 }
@@ -62,13 +60,4 @@ pub fn validate(
           )])
         }
     }
-}
-
-fn is_private(func_def: &FunctionDefinition) -> bool {
-    func_def.attributes.iter().any(|a| match a {
-        FunctionAttribute::Visibility(v) => {
-            matches!(v, Visibility::Private(_) | Visibility::Internal(_))
-        }
-        _ => false,
-    })
 }

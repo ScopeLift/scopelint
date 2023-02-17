@@ -1,10 +1,8 @@
 use crate::check::{
     report::{InvalidItem, Validator},
-    utils::{offset_to_line, FileKind, IsFileKind, Name},
+    utils::{offset_to_line, FileKind, IsFileKind, Name, VisibilitySummary},
 };
-use solang_parser::pt::{
-    ContractPart, FunctionAttribute, FunctionDefinition, SourceUnit, SourceUnitPart, Visibility,
-};
+use solang_parser::pt::{ContractPart, SourceUnit, SourceUnitPart};
 use std::{error::Error, path::Path};
 
 pub fn validate(
@@ -21,7 +19,7 @@ pub fn validate(
         match element {
             SourceUnitPart::FunctionDefinition(f) => {
                 let name = f.name();
-                if is_private(f) && !is_valid_internal_or_private_name(&name) {
+                if f.is_internal_or_private() && !is_valid_internal_or_private_name(&name) {
                     invalid_items.push(InvalidItem::new(
                         Validator::Src,
                         file.display().to_string(),
@@ -34,7 +32,7 @@ pub fn validate(
                 for el in &c.parts {
                     if let ContractPart::FunctionDefinition(f) = el {
                         let name = f.name();
-                        if is_private(f) && !is_valid_internal_or_private_name(&name) {
+                        if f.is_internal_or_private() && !is_valid_internal_or_private_name(&name) {
                             invalid_items.push(InvalidItem::new(
                                 Validator::Src,
                                 file.display().to_string(),
@@ -53,13 +51,4 @@ pub fn validate(
 
 fn is_valid_internal_or_private_name(name: &str) -> bool {
     name.starts_with('_')
-}
-
-fn is_private(func_def: &FunctionDefinition) -> bool {
-    func_def.attributes.iter().any(|a| match a {
-        FunctionAttribute::Visibility(v) => {
-            matches!(v, Visibility::Private(_) | Visibility::Internal(_))
-        }
-        _ => false,
-    })
 }

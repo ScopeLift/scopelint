@@ -1,4 +1,4 @@
-use solang_parser::pt::{FunctionDefinition, FunctionTy};
+use solang_parser::pt::{FunctionAttribute, FunctionDefinition, FunctionTy, Visibility};
 use std::path::Path;
 
 pub enum FileKind {
@@ -30,6 +30,11 @@ pub trait Name {
     fn name(&self) -> String;
 }
 
+pub trait VisibilitySummary {
+    fn is_internal_or_private(&self) -> bool;
+    fn is_public_or_external(&self) -> bool;
+}
+
 impl Name for FunctionDefinition {
     fn name(&self) -> String {
         match self.ty {
@@ -38,6 +43,26 @@ impl Name for FunctionDefinition {
             FunctionTy::Receive => "receive".to_string(),
             FunctionTy::Function | FunctionTy::Modifier => self.name.as_ref().unwrap().name.clone(),
         }
+    }
+}
+
+impl VisibilitySummary for FunctionDefinition {
+    fn is_internal_or_private(&self) -> bool {
+        self.attributes.iter().any(|a| match a {
+            FunctionAttribute::Visibility(v) => {
+                matches!(v, Visibility::Private(_) | Visibility::Internal(_))
+            }
+            _ => false,
+        })
+    }
+
+    fn is_public_or_external(&self) -> bool {
+        self.attributes.iter().any(|a| match a {
+            FunctionAttribute::Visibility(v) => {
+                matches!(v, Visibility::Public(_) | Visibility::External(_))
+            }
+            _ => false,
+        })
     }
 }
 
