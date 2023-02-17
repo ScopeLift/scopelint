@@ -2,8 +2,8 @@ use colored::Colorize;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use solang_parser::pt::{
-    ContractPart, FunctionAttribute, FunctionDefinition, FunctionTy, SourceUnitPart,
-    VariableAttribute, VariableDefinition, Visibility,
+    ContractPart, FunctionDefinition, FunctionTy, SourceUnitPart, VariableAttribute,
+    VariableDefinition,
 };
 use std::{error::Error, ffi::OsStr, fs, path::Path};
 use walkdir::WalkDir;
@@ -111,20 +111,17 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
                 continue
             }
 
-            // Executable script files are expected to end with `.s.sol`, whereas non-executable
-            // helper contracts in the scripts dir just end with `.sol`.
-            let is_script =
-                path == "./script" && dent.path().to_str().expect("Bad path").ends_with(".s.sol");
-
             // Get the parse tree (pt) of the file.
             let content = fs::read_to_string(dent.path())?;
             let (pt, _comments) = solang_parser::parse(&content, 0).expect("Parsing failed");
 
             results.add_items(checks::test_names::validate(dent.path(), &content, &pt)?);
             results.add_items(checks::src_names_internal::validate(dent.path(), &content, &pt)?);
-
-            // Variables used to track status of checks that are file-wide.
-            let mut public_methods: Vec<String> = Vec::new();
+            results.add_items(checks::script_one_pubic_run_method::validate(
+                dent.path(),
+                &content,
+                &pt,
+            )?);
 
             // Run checks.
             for element in pt.0 {
@@ -134,69 +131,12 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
                     }
                     SourceUnitPart::ContractDefinition(c) => {
                         for el in c.parts {
-                            match el {
-                                ContractPart::VariableDefinition(v) => {
-                                    results.add_items(v.validate(&content, dent.path()));
-                                }
-                                ContractPart::FunctionDefinition(f) => {
-                                    let name = f.name();
-                                    let is_private = f.attributes.iter().any(|a| match a {
-                                        FunctionAttribute::Visibility(v) => {
-                                            matches!(
-                                                v,
-                                                Visibility::Private(_) | Visibility::Internal(_)
-                                            )
-                                        }
-                                        _ => false,
-                                    });
-
-                                    if is_script &&
-                                        !is_private &&
-                                        name != "setUp" &&
-                                        name != "constructor"
-                                    {
-                                        public_methods.push(name);
-                                    }
-                                }
-                                _ => (),
+                            if let ContractPart::VariableDefinition(v) = el {
+                                results.add_items(v.validate(&content, dent.path()));
                             }
                         }
                     }
                     _ => (),
-                }
-            }
-
-            // Validate scripts only have a single public run method, or no public methods (i.e.
-            // it's a helper contract not a script).
-            if is_script {
-                // If we have no public methods, the `run` method is missing.
-                match public_methods.len() {
-                    0 => {
-                        results.add_item(report::InvalidItem::new(
-                            report::Validator::Script,
-                            dent.path().display().to_string(),
-                            "No `run` method found".to_string(),
-                            0, // This spans multiple lines, so we don't have a line number.
-                        ));
-                    }
-                    1 => {
-                        if public_methods[0] != "run" {
-                            results.add_item(report::InvalidItem::new(
-                                report::Validator::Script,
-                                dent.path().display().to_string(),
-                                "The only public method must be named `run`".to_string(),
-                                0,
-                            ));
-                        }
-                    }
-                    _ => {
-                        results.add_item(report::InvalidItem::new(
-                            report::Validator::Script,
-                            dent.path().display().to_string(),
-                            format!("Scripts must have a single public method named `run` (excluding `setUp`), but the following methods were found: {public_methods:?}"),
-                            0,
-                        ));
-                    }
                 }
             }
         }

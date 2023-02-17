@@ -1,8 +1,8 @@
-use crate::check::report;
 use solang_parser::pt::{FunctionDefinition, FunctionTy};
 use std::path::Path;
 
 pub enum FileKind {
+    ScriptContracts,
     SrcContracts,
     TestContracts,
 }
@@ -15,14 +15,15 @@ impl IsFileKind for Path {
     fn is_file_kind(&self, kind: FileKind) -> bool {
         let path = self.to_str().unwrap();
         match kind {
+            // Executable script files are expected to end with `.s.sol`, whereas non-executable
+            // helper contracts in the scripts dir just end with `.sol`.
+            FileKind::ScriptContracts => path.starts_with("./script") && path.ends_with(".s.sol"),
             FileKind::SrcContracts => path.starts_with("./src") && path.ends_with(".sol"),
+            // Contracts with test methods are expected to end with `.t.sol`, whereas e.g. mocks and
+            // helper contracts in the test dir just end with `.sol`.
             FileKind::TestContracts => path.starts_with("./test") && path.ends_with(".t.sol"),
         }
     }
-}
-
-pub trait Validate {
-    fn validate(&self, content: &str, file: &Path) -> Option<report::InvalidItem>;
 }
 
 pub trait Name {
