@@ -8,12 +8,16 @@ use std::{error::Error, path::Path};
 static RE_VALID_TEST_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^test(Fork)?(Fuzz)?(_Revert(If|When|On))?_(\w+)*$").unwrap());
 
+fn is_matching_file(file: &Path) -> bool {
+    file.is_file_kind(FileKind::TestContracts)
+}
+
 pub fn validate(
     file: &Path,
     content: &str,
     pt: &SourceUnit,
 ) -> Result<Vec<InvalidItem>, Box<dyn Error>> {
-    if !file.is_file_kind(FileKind::TestContracts) {
+    if !is_matching_file(file) {
         return Ok(Vec::new())
     }
 

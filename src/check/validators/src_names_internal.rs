@@ -4,12 +4,16 @@ use crate::check::utils::{
 use solang_parser::pt::{ContractPart, FunctionDefinition, SourceUnit, SourceUnitPart};
 use std::{error::Error, path::Path};
 
+fn is_matching_file(file: &Path) -> bool {
+    file.is_file_kind(FileKind::SrcContracts)
+}
+
 pub fn validate(
     file: &Path,
     content: &str,
     pt: &SourceUnit,
 ) -> Result<Vec<InvalidItem>, Box<dyn Error>> {
-    if !file.is_file_kind(FileKind::SrcContracts) {
+    if !is_matching_file(file) {
         return Ok(Vec::new())
     }
 

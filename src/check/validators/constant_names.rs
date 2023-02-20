@@ -10,11 +10,19 @@ use std::{error::Error, path::Path};
 static RE_VALID_CONSTANT_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(?:[$_]*[A-Z0-9][$_]*){1,}$").unwrap());
 
+const fn is_matching_file(_file: &Path) -> bool {
+    true
+}
+
 pub fn validate(
     file: &Path,
     content: &str,
     pt: &SourceUnit,
 ) -> Result<Vec<InvalidItem>, Box<dyn Error>> {
+    if !is_matching_file(file) {
+        return Ok(Vec::new())
+    }
+
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
     for element in &pt.0 {
         match element {

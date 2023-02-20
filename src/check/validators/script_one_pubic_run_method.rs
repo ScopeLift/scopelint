@@ -2,12 +2,16 @@ use crate::check::utils::{FileKind, InvalidItem, IsFileKind, Name, Validator, Vi
 use solang_parser::pt::{ContractPart, SourceUnit, SourceUnitPart};
 use std::{error::Error, path::Path};
 
+fn is_matching_file(file: &Path) -> bool {
+    file.is_file_kind(FileKind::ScriptContracts)
+}
+
 pub fn validate(
     file: &Path,
     _content: &str,
     pt: &SourceUnit,
 ) -> Result<Vec<InvalidItem>, Box<dyn Error>> {
-    if !file.is_file_kind(FileKind::ScriptContracts) {
+    if !is_matching_file(file) {
         return Ok(Vec::new())
     }
 
