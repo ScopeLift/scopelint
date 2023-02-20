@@ -12,7 +12,7 @@ pub fn run(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> 
     // the codebase, whereas the other validators return granular information about what to fix
     // since they currently can't be fixed automatically.
     let valid_names = validate_conventions();
-    let valid_fmt = validators::formatting::run(taplo_opts);
+    let valid_fmt = validators::formatting::validate(taplo_opts);
 
     if valid_names.is_ok() && valid_fmt.is_ok() {
         Ok(())

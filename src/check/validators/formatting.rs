@@ -1,7 +1,7 @@
 use colored::Colorize;
 use std::{error::Error, fs, process};
 
-pub fn run(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
+pub fn validate(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     // Check Solidity with `forge fmt`.
     let forge_status = process::Command::new("forge").arg("fmt").arg("--check").output()?;
 
