@@ -1,6 +1,6 @@
 # ScopeLint
 
-A simple and opinionated tool designed to for basic formatting/linting of Solidity and TOML code in foundry projects.
+A simple and opinionated tool designed for basic formatting/linting of Solidity and TOML code in foundry projects.
 
 ## Overview
 
