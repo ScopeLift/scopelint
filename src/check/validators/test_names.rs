@@ -1,4 +1,6 @@
-use crate::check::utils::{offset_to_line, FileKind, InvalidItem, IsFileKind, Name, Validator};
+use crate::check::utils::{
+    offset_to_line, FileKind, InvalidItem, IsFileKind, Name, Validator, VisibilitySummary,
+};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use solang_parser::pt::{ContractPart, FunctionDefinition, SourceUnit, SourceUnitPart};
@@ -45,15 +47,16 @@ pub fn validate(
 }
 
 fn is_valid_test_name(name: &str) -> bool {
-    if !name.starts_with("test") {
-        return true // Not a test function, so return true and skip this check.
-    }
     name.starts_with("test") && RE_VALID_TEST_NAME.is_match(name)
+}
+
+fn is_test_function(f: &FunctionDefinition) -> bool {
+    f.is_public_or_external() && f.name().starts_with("test")
 }
 
 fn validate_name(file: &Path, content: &str, f: &FunctionDefinition) -> Option<InvalidItem> {
     let name = f.name();
-    if !is_valid_test_name(&name) {
+    if is_test_function(f) && !is_valid_test_name(&name) {
         Some(InvalidItem::new(
             Validator::Test,
             file.display().to_string(),
@@ -70,7 +73,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn validate_test_names_regex() {
+    fn test_is_valid_test_name() {
         let allowed_names = vec![
             "test_Description",
             "test_Increment",
@@ -117,5 +120,50 @@ mod tests {
         for name in disallowed_names {
             assert_eq!(is_valid_test_name(name), false, "{name}");
         }
+    }
+
+    #[test]
+    fn test_validate() {
+        let content = r#"
+            contract MyContract {
+                // Good test names.
+                function test_Description() public {}
+                function test_Increment() public {}
+                function testFuzz_Description() external {}
+                function testFork_Description() external {}
+
+                // Bad test names.
+                function test() public {}
+                function testDescription() public {}
+                function testDescriptionMoreInfo() external {}
+
+                // Things that are not tests and should be ignored.
+                function test() internal {}
+                function testDescription() internal {}
+                function testDescriptionMoreInfo() private {}
+
+                function _test() public {}
+                function _testDescription() public {}
+                function _testDescriptionMoreInfo() public {}
+            }
+        "#;
+
+        let (pt, _comments) = solang_parser::parse(&content, 0).expect("Parsing failed");
+
+        let invalid_items_script_helper =
+            validate(Path::new("./script/MyContract.sol"), content, &pt).unwrap();
+        let invalid_items_script =
+            validate(Path::new("./script/MyContract.s.sol"), content, &pt).unwrap();
+        let invalid_items_src = validate(Path::new("./src/MyContract.sol"), content, &pt).unwrap();
+        let invalid_items_test_helper =
+            validate(Path::new("./test/MyContract.sol"), content, &pt).unwrap();
+        let invalid_items_test =
+            validate(Path::new("./test/MyContract.t.sol"), content, &pt).unwrap();
+
+        assert_eq!(invalid_items_script_helper.len(), 0);
+        assert_eq!(invalid_items_script.len(), 0);
+        assert_eq!(invalid_items_src.len(), 0);
+        assert_eq!(invalid_items_test_helper.len(), 0);
+        assert_eq!(invalid_items_test.len(), 3);
     }
 }

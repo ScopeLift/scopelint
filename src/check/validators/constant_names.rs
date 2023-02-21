@@ -74,7 +74,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn validate_constant_names_regex() {
+    fn test_is_valid_constant_name() {
         let allowed_names = vec![
             "MAX_UINT256",
             "256_MAXUINT",
@@ -118,5 +118,42 @@ mod tests {
         for name in disallowed_names {
             assert_eq!(is_valid_constant_name(name), false, "{name}");
         }
+    }
+
+    #[test]
+    fn test_validate() {
+        let content = r#"
+            contract MyContract {
+                // These have the constant or immutable keyword and should be valid.
+                uint256 constant MAX_UINT256 = type(uint256).max;
+                address constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
+                // These have the constant/immutable keyword and should be invalid.
+                bytes32 immutable zeroBytes = 0;
+                int256 immutable minInt256 = type(int256).min;
+
+                // These should all be valid since they are not constant or immutable.
+                address alice = address(123);
+                uint256 aliceBalance = 500;
+            }
+        "#;
+
+        let (pt, _comments) = solang_parser::parse(&content, 0).expect("Parsing failed");
+
+        let invalid_items_script_helper =
+            validate(Path::new("./script/MyContract.sol"), content, &pt).unwrap();
+        let invalid_items_script =
+            validate(Path::new("./script/MyContract.s.sol"), content, &pt).unwrap();
+        let invalid_items_src = validate(Path::new("./src/MyContract.sol"), content, &pt).unwrap();
+        let invalid_items_test_helper =
+            validate(Path::new("./test/MyContract.sol"), content, &pt).unwrap();
+        let invalid_items_test =
+            validate(Path::new("./test/MyContract.t.sol"), content, &pt).unwrap();
+
+        assert_eq!(invalid_items_script_helper.len(), 2);
+        assert_eq!(invalid_items_script.len(), 2);
+        assert_eq!(invalid_items_src.len(), 2);
+        assert_eq!(invalid_items_test_helper.len(), 2);
+        assert_eq!(invalid_items_test.len(), 2);
     }
 }

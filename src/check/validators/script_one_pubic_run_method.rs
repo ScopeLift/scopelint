@@ -62,3 +62,62 @@ pub fn validate(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate() {
+        // TODO add another test for the third match arm
+        let content_good = r#"
+            contract MyContract {
+                function run() public {}
+            }
+        "#;
+
+        let content_bad = r#"
+            contract MyContract {
+                function run() public {}
+                function run(string memory config) public {}
+            }
+        "#;
+
+        let (pt_good, _comments) = solang_parser::parse(&content_good, 0).expect("Parsing failed");
+        let (pt_bad, _comments) = solang_parser::parse(&content_bad, 0).expect("Parsing failed");
+
+        let invalid_items_script_helper_good =
+            validate(Path::new("./script/MyContract.sol"), content_good, &pt_good).unwrap();
+        let invalid_items_script_good =
+            validate(Path::new("./script/MyContract.s.sol"), content_good, &pt_good).unwrap();
+        let invalid_items_src_good =
+            validate(Path::new("./src/MyContract.sol"), content_good, &pt_good).unwrap();
+        let invalid_items_test_helper_good =
+            validate(Path::new("./test/MyContract.sol"), content_good, &pt_good).unwrap();
+        let invalid_items_test_good =
+            validate(Path::new("./test/MyContract.t.sol"), content_good, &pt_good).unwrap();
+
+        let invalid_items_script_helper_bad =
+            validate(Path::new("./script/MyContract.sol"), content_bad, &pt_bad).unwrap();
+        let invalid_items_script_bad =
+            validate(Path::new("./script/MyContract.s.sol"), content_bad, &pt_bad).unwrap();
+        let invalid_items_src_bad =
+            validate(Path::new("./src/MyContract.sol"), content_bad, &pt_bad).unwrap();
+        let invalid_items_test_helper_bad =
+            validate(Path::new("./test/MyContract.sol"), content_bad, &pt_bad).unwrap();
+        let invalid_items_test_bad =
+            validate(Path::new("./test/MyContract.t.sol"), content_bad, &pt_bad).unwrap();
+
+        assert_eq!(invalid_items_script_helper_good.len(), 0);
+        assert_eq!(invalid_items_script_good.len(), 0);
+        assert_eq!(invalid_items_src_good.len(), 0);
+        assert_eq!(invalid_items_test_helper_good.len(), 0);
+        assert_eq!(invalid_items_test_good.len(), 0);
+
+        assert_eq!(invalid_items_script_helper_bad.len(), 0);
+        assert_eq!(invalid_items_script_bad.len(), 1);
+        assert_eq!(invalid_items_src_bad.len(), 0);
+        assert_eq!(invalid_items_test_helper_bad.len(), 0);
+        assert_eq!(invalid_items_test_bad.len(), 0);
+    }
+}
