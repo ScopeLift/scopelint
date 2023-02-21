@@ -2,19 +2,17 @@ use crate::check::utils::{offset_to_line, InvalidItem, Validator};
 use solang_parser::pt::{
     ContractPart, SourceUnit, SourceUnitPart, VariableAttribute, VariableDefinition,
 };
-use std::{error::Error, path::Path};
+use std::path::Path;
 
 const fn is_matching_file(_file: &Path) -> bool {
     true // Update the matching condition, see helpers in `src/check/utils.rs`.
 }
 
-pub fn validate(
-    file: &Path,
-    content: &str,
-    pt: &SourceUnit,
-) -> Result<Vec<InvalidItem>, Box<dyn Error>> {
+#[must_use]
+/// Validates that <explain validator>.
+pub fn validate(file: &Path, content: &str, pt: &SourceUnit) -> Vec<InvalidItem> {
     if !is_matching_file(file) {
-        return Ok(Vec::new())
+        return Vec::new()
     }
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
@@ -24,7 +22,7 @@ pub fn validate(
             _ => (),
         }
     }
-    Ok(invalid_items)
+    invalid_items
 }
 
 // Add any helper methods here. The `validate` method should be the only public method.

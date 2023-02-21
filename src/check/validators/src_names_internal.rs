@@ -2,19 +2,17 @@ use crate::check::utils::{
     offset_to_line, FileKind, InvalidItem, IsFileKind, Name, ValidatorKind, VisibilitySummary,
 };
 use solang_parser::pt::{ContractPart, FunctionDefinition, SourceUnit, SourceUnitPart};
-use std::{error::Error, path::Path};
+use std::path::Path;
 
 fn is_matching_file(file: &Path) -> bool {
-    file.is_file_kind(FileKind::SrcContracts)
+    file.is_file_kind(FileKind::Src)
 }
 
-pub fn validate(
-    file: &Path,
-    content: &str,
-    pt: &SourceUnit,
-) -> Result<Vec<InvalidItem>, Box<dyn Error>> {
+#[must_use]
+/// Validates that internal and private function names are prefixed with an underscore.
+pub fn validate(file: &Path, content: &str, pt: &SourceUnit) -> Vec<InvalidItem> {
     if !is_matching_file(file) {
-        return Ok(Vec::new())
+        return Vec::new()
     }
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
@@ -37,7 +35,7 @@ pub fn validate(
             _ => (),
         }
     }
-    Ok(invalid_items)
+    invalid_items
 }
 
 fn is_valid_internal_or_private_name(name: &str) -> bool {

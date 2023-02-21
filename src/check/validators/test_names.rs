@@ -4,23 +4,21 @@ use crate::check::utils::{
 use once_cell::sync::Lazy;
 use regex::Regex;
 use solang_parser::pt::{ContractPart, FunctionDefinition, SourceUnit, SourceUnitPart};
-use std::{error::Error, path::Path};
+use std::path::Path;
 
 // A regex matching valid test names, see the `validate_test_names_regex` test for examples.
 static RE_VALID_TEST_NAME: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^test(Fork)?(Fuzz)?(_Revert(If|When|On))?_(\w+)*$").unwrap());
 
 fn is_matching_file(file: &Path) -> bool {
-    file.is_file_kind(FileKind::TestContracts)
+    file.is_file_kind(FileKind::Test)
 }
 
-pub fn validate(
-    file: &Path,
-    content: &str,
-    pt: &SourceUnit,
-) -> Result<Vec<InvalidItem>, Box<dyn Error>> {
+#[must_use]
+/// Validates that test names are in the correct format.
+pub fn validate(file: &Path, content: &str, pt: &SourceUnit) -> Vec<InvalidItem> {
     if !is_matching_file(file) {
-        return Ok(Vec::new())
+        return Vec::new()
     }
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
@@ -43,7 +41,7 @@ pub fn validate(
             _ => (),
         }
     }
-    Ok(invalid_items)
+    invalid_items
 }
 
 fn is_valid_test_name(name: &str) -> bool {

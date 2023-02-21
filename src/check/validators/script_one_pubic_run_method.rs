@@ -2,19 +2,17 @@ use crate::check::utils::{
     FileKind, InvalidItem, IsFileKind, Name, ValidatorKind, VisibilitySummary,
 };
 use solang_parser::pt::{ContractPart, SourceUnit, SourceUnitPart};
-use std::{error::Error, path::Path};
+use std::path::Path;
 
 fn is_matching_file(file: &Path) -> bool {
-    file.is_file_kind(FileKind::ScriptContracts)
+    file.is_file_kind(FileKind::Script)
 }
 
-pub fn validate(
-    file: &Path,
-    _content: &str,
-    pt: &SourceUnit,
-) -> Result<Vec<InvalidItem>, Box<dyn Error>> {
+#[must_use]
+/// Validates that a script has a single public method named `run`.
+pub fn validate(file: &Path, _content: &str, pt: &SourceUnit) -> Vec<InvalidItem> {
     if !is_matching_file(file) {
-        return Ok(Vec::new())
+        return Vec::new()
     }
 
     let mut public_methods: Vec<String> = Vec::new();
@@ -35,32 +33,32 @@ pub fn validate(
     // invalid item otherwise.
     match public_methods.len() {
         0 => {
-            Ok(vec![InvalidItem::new(
+            vec![InvalidItem::new(
                 ValidatorKind::Script,
                 file.display().to_string(),
                 "No `run` method found".to_string(),
                 0, // This spans multiple lines, so we don't have a line number.
-            )])
+            )]
         }
         1 => {
             if public_methods[0] == "run" {
-                Ok(Vec::new())
+                Vec::new()
             } else {
-                Ok(vec![InvalidItem::new(
+                vec![InvalidItem::new(
                     ValidatorKind::Script,
                     file.display().to_string(),
                     "The only public method must be named `run`".to_string(),
                     0,
-                )])
+                )]
             }
         }
         _ => {
-            Ok(vec![InvalidItem::new(
+            vec![InvalidItem::new(
               ValidatorKind::Script,
               file.display().to_string(),
               format!("Scripts must have a single public method named `run` (excluding `setUp`), but the following methods were found: {public_methods:?}"),
               0,
-          )])
+          )]
         }
     }
 }

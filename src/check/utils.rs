@@ -6,7 +6,7 @@
 use solang_parser::pt::{
     FunctionAttribute, FunctionDefinition, FunctionTy, SourceUnit, Visibility,
 };
-use std::{error::Error, path::Path};
+use std::path::Path;
 
 /// The type of validator that found the invalid item.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -32,11 +32,14 @@ pub struct InvalidItem {
 
 impl InvalidItem {
     #[must_use]
+    /// Creates a new `InvalidItem`.
     pub const fn new(kind: ValidatorKind, file: String, text: String, line: usize) -> Self {
         Self { kind, file, text, line }
     }
 
     #[must_use]
+    /// Returns a string describing the invalid item, which is shown to the user so they can triage
+    /// findings.
     pub fn description(&self) -> String {
         match self.kind {
             ValidatorKind::Test => {
@@ -61,13 +64,21 @@ impl InvalidItem {
     }
 }
 
+/// Categories of file kinds found in forge projects.
+/// Two additional file kinds are not included here: `ScriptHelpers` and `TestHelpers`. These are
+/// not currently used in any checks so they are excluded for now.
 pub enum FileKind {
-    ScriptContracts,
-    SrcContracts,
-    TestContracts,
+    /// Executable script files live in the `scripts` directory and end with `.s.sol`.
+    Script,
+    /// Core contracts live in the `src` directory and end with `.sol`.
+    Src,
+    /// Contracts with test methods live in the `test` directory and end with `.t.sol`.
+    Test,
 }
 
+/// Provides a method to check if a file is of a given kind.
 pub trait IsFileKind {
+    /// Returns `true` if the file is of the given kind, `false` otherwise.
     fn is_file_kind(&self, kind: FileKind) -> bool;
 }
 
@@ -75,23 +86,25 @@ impl IsFileKind for Path {
     fn is_file_kind(&self, kind: FileKind) -> bool {
         let path = self.to_str().unwrap();
         match kind {
-            // Executable script files are expected to end with `.s.sol`, whereas non-executable
-            // helper contracts in the scripts dir just end with `.sol`.
-            FileKind::ScriptContracts => path.starts_with("./script") && path.ends_with(".s.sol"),
-            FileKind::SrcContracts => path.starts_with("./src") && path.ends_with(".sol"),
-            // Contracts with test methods are expected to end with `.t.sol`, whereas e.g. mocks and
-            // helper contracts in the test dir just end with `.sol`.
-            FileKind::TestContracts => path.starts_with("./test") && path.ends_with(".t.sol"),
+            FileKind::Script => path.starts_with("./script") && path.ends_with(".s.sol"),
+            FileKind::Src => path.starts_with("./src") && path.ends_with(".sol"),
+            FileKind::Test => path.starts_with("./test") && path.ends_with(".t.sol"),
         }
     }
 }
 
+/// Provides a method to return the name of a function.
 pub trait Name {
+    /// Returns the name of the function for standard functions, or `constructor`, `fallback` or
+    /// `receive` for other function types.
     fn name(&self) -> String;
 }
 
+/// Provides methods to return visibility information about a function.
 pub trait VisibilitySummary {
+    /// Returns `true` if the function is internal or private, `false` otherwise.
     fn is_internal_or_private(&self) -> bool;
+    /// Returns `true` if the function is public or external, `false` otherwise.
     fn is_public_or_external(&self) -> bool;
 }
 
@@ -126,8 +139,8 @@ impl VisibilitySummary for FunctionDefinition {
     }
 }
 
-// Converts the start offset of a `Loc` to `(line, col)`. Modified from https://github.com/foundry-rs/foundry/blob/45b9dccdc8584fb5fbf55eb190a880d4e3b0753f/fmt/src/helpers.rs#L54-L70
 #[must_use]
+/// Converts the start offset of a `Loc` to `(line, col)`. Modified from <https://github.com/foundry-rs/foundry/blob/45b9dccdc8584fb5fbf55eb190a880d4e3b0753f/fmt/src/helpers.rs#L54-L70>
 pub fn offset_to_line(content: &str, start: usize) -> usize {
     debug_assert!(content.len() > start);
 
@@ -144,19 +157,30 @@ pub fn offset_to_line(content: &str, start: usize) -> usize {
     unreachable!("content.len() > start")
 }
 
-pub type ValidatorFn = dyn Fn(&Path, &str, &SourceUnit) -> Result<Vec<InvalidItem>, Box<dyn Error>>;
-
 #[derive(Default)]
+/// Given the number of expected findings for each file kind, this struct makes it easy to assert
+/// the true number of findings for each file kind by calling it's `assert_eq` method.
 pub struct ExpectedFindings {
+    /// The number of expected findings for script helper contracts.
     pub script_helper: usize,
+    /// The number of expected findings for script contracts.
     pub script: usize,
+    /// The number of expected findings for source contracts.
     pub src: usize,
+    /// The number of expected findings for test helper contracts.
     pub test_helper: usize,
+    /// The number of expected findings for test contracts.
     pub test: usize,
 }
 
+type ValidatorFn = dyn Fn(&Path, &str, &SourceUnit) -> Vec<InvalidItem>;
+
 impl ExpectedFindings {
     #[must_use]
+    /// Creates a new `ExpectedFindings` with the given number of expected findings for each file
+    /// kind. Use this when a validator applies to all file kinds. If a validator only applies to
+    /// certain file kinds, you should initialize it using the form
+    /// `ExpectedFindings { test: 3, ..ExpectedFindings::default() }`.
     pub const fn new(expected_findings: usize) -> Self {
         Self {
             script_helper: expected_findings,
@@ -167,18 +191,19 @@ impl ExpectedFindings {
         }
     }
 
+    /// Asserts that the number of invalid items found by the validator is equal to the expected
+    /// number for the given content, for each file kind.
+    /// # Panics
+    /// In practice this should not panic unless one of validations fails.
     pub fn assert_eq(&self, content: &str, validate: &ValidatorFn) {
         let (pt, _comments) = solang_parser::parse(content, 0).expect("Parsing failed");
 
         let invalid_items_script_helper =
-            validate(Path::new("./script/MyContract.sol"), content, &pt).unwrap();
-        let invalid_items_script =
-            validate(Path::new("./script/MyContract.s.sol"), content, &pt).unwrap();
-        let invalid_items_src = validate(Path::new("./src/MyContract.sol"), content, &pt).unwrap();
-        let invalid_items_test_helper =
-            validate(Path::new("./test/MyContract.sol"), content, &pt).unwrap();
-        let invalid_items_test =
-            validate(Path::new("./test/MyContract.t.sol"), content, &pt).unwrap();
+            validate(Path::new("./script/MyContract.sol"), content, &pt);
+        let invalid_items_script = validate(Path::new("./script/MyContract.s.sol"), content, &pt);
+        let invalid_items_src = validate(Path::new("./src/MyContract.sol"), content, &pt);
+        let invalid_items_test_helper = validate(Path::new("./test/MyContract.sol"), content, &pt);
+        let invalid_items_test = validate(Path::new("./test/MyContract.t.sol"), content, &pt);
 
         assert_eq!(invalid_items_script_helper.len(), self.script_helper);
         assert_eq!(invalid_items_script.len(), self.script);

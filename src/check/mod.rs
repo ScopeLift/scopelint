@@ -2,11 +2,18 @@ use colored::Colorize;
 use std::{error::Error, ffi::OsStr, fs};
 use walkdir::WalkDir;
 
+/// Contains all the types and methods to generate a report of all the invalid items found.
 pub mod report;
+
+/// Contains helper methods, traits, etc. used by the validators and report generation.
 pub mod utils;
+
+/// Contains all the validators to ensure Solidity files follow conventions and best practices.
 pub mod validators;
 
 /// Validates the code formatting, and print details on any conventions that are not being followed.
+/// # Errors
+/// Returns an error if the formatting or convention validations fail.
 pub fn run(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
     // We run the formatting check separate to just indicate whether or not the user needs to format
     // the codebase, whereas the other validators return granular information about what to fix
@@ -61,11 +68,11 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
             let (pt, _comments) = solang_parser::parse(&content, 0).expect("Parsing failed");
 
             // Run all checks.
-            results.add_items(validators::test_names::validate(file, &content, &pt)?);
-            results.add_items(validators::src_names_internal::validate(file, &content, &pt)?);
+            results.add_items(validators::test_names::validate(file, &content, &pt));
+            results.add_items(validators::src_names_internal::validate(file, &content, &pt));
             results
-                .add_items(validators::script_one_pubic_run_method::validate(file, &content, &pt)?);
-            results.add_items(validators::constant_names::validate(file, &content, &pt)?);
+                .add_items(validators::script_one_pubic_run_method::validate(file, &content, &pt));
+            results.add_items(validators::constant_names::validate(file, &content, &pt));
         }
     }
     Ok(results)

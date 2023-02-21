@@ -1,13 +1,17 @@
 #![doc = include_str!("../README.md")]
 #![warn(unreachable_pub, unused, rust_2021_compatibility)]
 #![warn(clippy::all, clippy::pedantic, clippy::cargo, clippy::nursery)]
-#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc, clippy::multiple_crate_versions)]
+#![allow(clippy::multiple_crate_versions)]
 use std::error::Error;
 
+/// Runs validators on Solidity files.
 pub mod check;
+
+/// Parses library configuration.
 pub mod config;
+
+/// Formats Solidity and TOML files.
 pub mod fmt;
-pub mod version;
 
 // ===========================
 // ======== Execution ========

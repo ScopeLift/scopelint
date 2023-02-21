@@ -4,7 +4,7 @@ use regex::Regex;
 use solang_parser::pt::{
     ContractPart, SourceUnit, SourceUnitPart, VariableAttribute, VariableDefinition,
 };
-use std::{error::Error, path::Path};
+use std::path::Path;
 
 // A regex matching valid constant names, see the `validate_constant_names_regex` test for examples.
 static RE_VALID_CONSTANT_NAME: Lazy<Regex> =
@@ -14,13 +14,11 @@ const fn is_matching_file(_file: &Path) -> bool {
     true
 }
 
-pub fn validate(
-    file: &Path,
-    content: &str,
-    pt: &SourceUnit,
-) -> Result<Vec<InvalidItem>, Box<dyn Error>> {
+#[must_use]
+/// Validates that constant and immutable variable names are in `ALL_CAPS`.
+pub fn validate(file: &Path, content: &str, pt: &SourceUnit) -> Vec<InvalidItem> {
     if !is_matching_file(file) {
-        return Ok(Vec::new())
+        return Vec::new()
     }
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
@@ -43,7 +41,7 @@ pub fn validate(
             _ => (),
         }
     }
-    Ok(invalid_items)
+    invalid_items
 }
 
 fn is_valid_constant_name(name: &str) -> bool {
