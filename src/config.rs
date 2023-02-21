@@ -17,5 +17,5 @@ pub enum Subcommands {
     Check,
     #[clap(about = "Formats Solidity and TOML files in the codebase.")]
     /// Formats Solidity and TOML files in the codebase.
-    Format,
+    Fmt,
 }

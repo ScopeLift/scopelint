@@ -31,7 +31,7 @@ pub fn run(opts: &config::Opts) -> Result<(), Box<dyn Error>> {
 
     // Execute commands.
     match opts.subcommand {
-        config::Subcommands::Format => fmt::run(taplo_opts),
+        config::Subcommands::Fmt => fmt::run(taplo_opts),
         config::Subcommands::Check => check::run(taplo_opts),
     }
 }
