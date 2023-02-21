@@ -74,6 +74,36 @@ mod tests {
     use crate::check::utils::ExpectedFindings;
 
     #[test]
+    fn test_validate() {
+        let content = r#"
+            contract MyContract {
+                // Good test names.
+                function test_Description() public {}
+                function test_Increment() public {}
+                function testFuzz_Description() external {}
+                function testFork_Description() external {}
+
+                // Bad test names.
+                function test() public {}
+                function testDescription() public {}
+                function testDescriptionMoreInfo() external {}
+
+                // Things that are not tests and should be ignored.
+                function test() internal {}
+                function testDescription() internal {}
+                function testDescriptionMoreInfo() private {}
+
+                function _test() public {}
+                function _testDescription() public {}
+                function _testDescriptionMoreInfo() public {}
+            }
+        "#;
+
+        let expected_findings = ExpectedFindings { test: 3, ..ExpectedFindings::default() };
+        expected_findings.assert_eq(content, &validate);
+    }
+
+    #[test]
     fn test_is_valid_test_name() {
         let allowed_names = vec![
             "test_Description",
@@ -121,35 +151,5 @@ mod tests {
         for name in disallowed_names {
             assert_eq!(is_valid_test_name(name), false, "{name}");
         }
-    }
-
-    #[test]
-    fn test_validate() {
-        let content = r#"
-            contract MyContract {
-                // Good test names.
-                function test_Description() public {}
-                function test_Increment() public {}
-                function testFuzz_Description() external {}
-                function testFork_Description() external {}
-
-                // Bad test names.
-                function test() public {}
-                function testDescription() public {}
-                function testDescriptionMoreInfo() external {}
-
-                // Things that are not tests and should be ignored.
-                function test() internal {}
-                function testDescription() internal {}
-                function testDescriptionMoreInfo() private {}
-
-                function _test() public {}
-                function _testDescription() public {}
-                function _testDescriptionMoreInfo() public {}
-            }
-        "#;
-
-        let expected_findings = ExpectedFindings { test: 3, ..ExpectedFindings::default() };
-        expected_findings.assert_eq(content, &validate);
     }
 }

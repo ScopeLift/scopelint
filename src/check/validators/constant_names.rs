@@ -75,6 +75,28 @@ mod tests {
     use crate::check::utils::ExpectedFindings;
 
     #[test]
+    fn test_validate() {
+        let content = r#"
+            contract MyContract {
+                // These have the constant or immutable keyword and should be valid.
+                uint256 constant MAX_UINT256 = type(uint256).max;
+                address constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
+                // These have the constant/immutable keyword and should be invalid.
+                bytes32 immutable zeroBytes = 0;
+                int256 immutable minInt256 = type(int256).min;
+
+                // These should all be valid since they are not constant or immutable.
+                address alice = address(123);
+                uint256 aliceBalance = 500;
+            }
+        "#;
+
+        let expected_findings = ExpectedFindings::new(2);
+        expected_findings.assert_eq(content, &validate);
+    }
+
+    #[test]
     fn test_is_valid_constant_name() {
         let allowed_names = vec![
             "MAX_UINT256",
@@ -119,27 +141,5 @@ mod tests {
         for name in disallowed_names {
             assert_eq!(is_valid_constant_name(name), false, "{name}");
         }
-    }
-
-    #[test]
-    fn test_validate() {
-        let content = r#"
-            contract MyContract {
-                // These have the constant or immutable keyword and should be valid.
-                uint256 constant MAX_UINT256 = type(uint256).max;
-                address constant ETH_ADDRESS = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-
-                // These have the constant/immutable keyword and should be invalid.
-                bytes32 immutable zeroBytes = 0;
-                int256 immutable minInt256 = type(int256).min;
-
-                // These should all be valid since they are not constant or immutable.
-                address alice = address(123);
-                uint256 aliceBalance = 500;
-            }
-        "#;
-
-        let expected_findings = ExpectedFindings::new(2);
-        expected_findings.assert_eq(content, &validate);
     }
 }
