@@ -66,6 +66,7 @@ pub fn validate(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::check::utils::ExpectedFindings;
 
     #[test]
     fn test_validate() {
@@ -76,48 +77,46 @@ mod tests {
             }
         "#;
 
-        let content_bad = r#"
+        // The number after `bad` on the variable name indicates the match arm covered.
+        let content_bad0 = r#"
+            contract MyContract {}
+        "#;
+
+        let content_bad1 = r#"
+            contract MyContract {
+                function notRun() public {}
+            }
+        "#;
+
+        let content_bad2_variant0 = r#"
             contract MyContract {
                 function run() public {}
                 function run(string memory config) public {}
             }
         "#;
 
-        let (pt_good, _comments) = solang_parser::parse(&content_good, 0).expect("Parsing failed");
-        let (pt_bad, _comments) = solang_parser::parse(&content_bad, 0).expect("Parsing failed");
+        let content_bad2_variant1 = r#"
+            contract MyContract {
+                function run() public {}
+                function foo() public {}
+            }
+        "#;
 
-        let invalid_items_script_helper_good =
-            validate(Path::new("./script/MyContract.sol"), content_good, &pt_good).unwrap();
-        let invalid_items_script_good =
-            validate(Path::new("./script/MyContract.s.sol"), content_good, &pt_good).unwrap();
-        let invalid_items_src_good =
-            validate(Path::new("./src/MyContract.sol"), content_good, &pt_good).unwrap();
-        let invalid_items_test_helper_good =
-            validate(Path::new("./test/MyContract.sol"), content_good, &pt_good).unwrap();
-        let invalid_items_test_good =
-            validate(Path::new("./test/MyContract.t.sol"), content_good, &pt_good).unwrap();
+        let content_bad2_variant2 = r#"
+            contract MyContract {
+                function foo() public {}
+                function bar() public {}
+            }
+        "#;
 
-        let invalid_items_script_helper_bad =
-            validate(Path::new("./script/MyContract.sol"), content_bad, &pt_bad).unwrap();
-        let invalid_items_script_bad =
-            validate(Path::new("./script/MyContract.s.sol"), content_bad, &pt_bad).unwrap();
-        let invalid_items_src_bad =
-            validate(Path::new("./src/MyContract.sol"), content_bad, &pt_bad).unwrap();
-        let invalid_items_test_helper_bad =
-            validate(Path::new("./test/MyContract.sol"), content_bad, &pt_bad).unwrap();
-        let invalid_items_test_bad =
-            validate(Path::new("./test/MyContract.t.sol"), content_bad, &pt_bad).unwrap();
+        let expected_findings_good = ExpectedFindings::new(0);
+        expected_findings_good.assert_eq(content_good, &validate);
 
-        assert_eq!(invalid_items_script_helper_good.len(), 0);
-        assert_eq!(invalid_items_script_good.len(), 0);
-        assert_eq!(invalid_items_src_good.len(), 0);
-        assert_eq!(invalid_items_test_helper_good.len(), 0);
-        assert_eq!(invalid_items_test_good.len(), 0);
-
-        assert_eq!(invalid_items_script_helper_bad.len(), 0);
-        assert_eq!(invalid_items_script_bad.len(), 1);
-        assert_eq!(invalid_items_src_bad.len(), 0);
-        assert_eq!(invalid_items_test_helper_bad.len(), 0);
-        assert_eq!(invalid_items_test_bad.len(), 0);
+        let expected_findings_bad = ExpectedFindings { script: 1, ..Default::default() };
+        expected_findings_bad.assert_eq(content_bad0, &validate);
+        expected_findings_bad.assert_eq(content_bad1, &validate);
+        expected_findings_bad.assert_eq(content_bad2_variant0, &validate);
+        expected_findings_bad.assert_eq(content_bad2_variant1, &validate);
+        expected_findings_bad.assert_eq(content_bad2_variant2, &validate);
     }
 }

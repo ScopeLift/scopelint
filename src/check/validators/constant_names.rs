@@ -72,6 +72,7 @@ fn validate_name(file: &Path, content: &str, v: &VariableDefinition) -> Option<I
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::check::utils::ExpectedFindings;
 
     #[test]
     fn test_is_valid_constant_name() {
@@ -138,22 +139,7 @@ mod tests {
             }
         "#;
 
-        let (pt, _comments) = solang_parser::parse(&content, 0).expect("Parsing failed");
-
-        let invalid_items_script_helper =
-            validate(Path::new("./script/MyContract.sol"), content, &pt).unwrap();
-        let invalid_items_script =
-            validate(Path::new("./script/MyContract.s.sol"), content, &pt).unwrap();
-        let invalid_items_src = validate(Path::new("./src/MyContract.sol"), content, &pt).unwrap();
-        let invalid_items_test_helper =
-            validate(Path::new("./test/MyContract.sol"), content, &pt).unwrap();
-        let invalid_items_test =
-            validate(Path::new("./test/MyContract.t.sol"), content, &pt).unwrap();
-
-        assert_eq!(invalid_items_script_helper.len(), 2);
-        assert_eq!(invalid_items_script.len(), 2);
-        assert_eq!(invalid_items_src.len(), 2);
-        assert_eq!(invalid_items_test_helper.len(), 2);
-        assert_eq!(invalid_items_test.len(), 2);
+        let expected_findings = ExpectedFindings::new(2);
+        expected_findings.assert_eq(content, &validate);
     }
 }

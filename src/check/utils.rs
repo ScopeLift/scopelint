@@ -1,5 +1,7 @@
-use solang_parser::pt::{FunctionAttribute, FunctionDefinition, FunctionTy, Visibility};
-use std::path::Path;
+use solang_parser::pt::{
+    FunctionAttribute, FunctionDefinition, FunctionTy, SourceUnit, Visibility,
+};
+use std::{error::Error, path::Path};
 
 /// The type of validator that found the invalid item.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -135,4 +137,47 @@ pub fn offset_to_line(content: &str, start: usize) -> usize {
     }
 
     unreachable!("content.len() > start")
+}
+
+pub type ValidatorFn = dyn Fn(&Path, &str, &SourceUnit) -> Result<Vec<InvalidItem>, Box<dyn Error>>;
+
+#[derive(Default)]
+pub struct ExpectedFindings {
+    pub script_helper: u32,
+    pub script: u32,
+    pub src: u32,
+    pub test_helper: u32,
+    pub test: u32,
+}
+
+impl ExpectedFindings {
+    pub const fn new(expected_findings: u32) -> Self {
+        Self {
+            script_helper: expected_findings,
+            script: expected_findings,
+            src: expected_findings,
+            test_helper: expected_findings,
+            test: expected_findings,
+        }
+    }
+
+    pub fn assert_eq(&self, content: &str, validate: &ValidatorFn) {
+        let (pt, _comments) = solang_parser::parse(content, 0).expect("Parsing failed");
+
+        let invalid_items_script_helper =
+            validate(Path::new("./script/MyContract.sol"), content, &pt).unwrap();
+        let invalid_items_script =
+            validate(Path::new("./script/MyContract.s.sol"), content, &pt).unwrap();
+        let invalid_items_src = validate(Path::new("./src/MyContract.sol"), content, &pt).unwrap();
+        let invalid_items_test_helper =
+            validate(Path::new("./test/MyContract.sol"), content, &pt).unwrap();
+        let invalid_items_test =
+            validate(Path::new("./test/MyContract.t.sol"), content, &pt).unwrap();
+
+        assert_eq!(invalid_items_script_helper.len() as u32, self.script_helper);
+        assert_eq!(invalid_items_script.len() as u32, self.script);
+        assert_eq!(invalid_items_src.len() as u32, self.src);
+        assert_eq!(invalid_items_test_helper.len() as u32, self.test_helper);
+        assert_eq!(invalid_items_test.len() as u32, self.test);
+    }
 }
