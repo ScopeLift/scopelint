@@ -1,4 +1,4 @@
-use crate::check::utils::{offset_to_line, InvalidItem, Validator};
+use crate::check::utils::{offset_to_line, InvalidItem, ValidatorKind};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use solang_parser::pt::{
@@ -59,7 +59,7 @@ fn validate_name(file: &Path, content: &str, v: &VariableDefinition) -> Option<I
 
     if is_constant && !is_valid_constant_name(name) {
         Some(InvalidItem::new(
-            Validator::Constant,
+            ValidatorKind::Constant,
             file.display().to_string(),
             name.clone(),
             offset_to_line(content, v.loc.start()),

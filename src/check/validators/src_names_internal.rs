@@ -1,5 +1,5 @@
 use crate::check::utils::{
-    offset_to_line, FileKind, InvalidItem, IsFileKind, Name, Validator, VisibilitySummary,
+    offset_to_line, FileKind, InvalidItem, IsFileKind, Name, ValidatorKind, VisibilitySummary,
 };
 use solang_parser::pt::{ContractPart, FunctionDefinition, SourceUnit, SourceUnitPart};
 use std::{error::Error, path::Path};
@@ -48,7 +48,7 @@ fn validate_name(file: &Path, content: &str, f: &FunctionDefinition) -> Option<I
     let name = f.name();
     if f.is_internal_or_private() && !is_valid_internal_or_private_name(&name) {
         Some(InvalidItem::new(
-            Validator::Src,
+            ValidatorKind::Src,
             file.display().to_string(),
             name,
             offset_to_line(content, f.loc.start()),

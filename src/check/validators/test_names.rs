@@ -1,5 +1,5 @@
 use crate::check::utils::{
-    offset_to_line, FileKind, InvalidItem, IsFileKind, Name, Validator, VisibilitySummary,
+    offset_to_line, FileKind, InvalidItem, IsFileKind, Name, ValidatorKind, VisibilitySummary,
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -58,7 +58,7 @@ fn validate_name(file: &Path, content: &str, f: &FunctionDefinition) -> Option<I
     let name = f.name();
     if is_test_function(f) && !is_valid_test_name(&name) {
         Some(InvalidItem::new(
-            Validator::Test,
+            ValidatorKind::Test,
             file.display().to_string(),
             name,
             offset_to_line(content, f.loc.start()),

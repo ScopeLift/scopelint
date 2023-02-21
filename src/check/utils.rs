@@ -5,7 +5,7 @@ use std::{error::Error, path::Path};
 
 /// The type of validator that found the invalid item.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub enum Validator {
+pub enum ValidatorKind {
     /// A constant or immutable variable.
     Constant,
     /// A script file.
@@ -19,7 +19,7 @@ pub enum Validator {
 /// A single invalid item found by a validator.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct InvalidItem {
-    kind: Validator,
+    kind: ValidatorKind,
     file: String, // File name.
     text: String, // Details to show about the invalid item.
     line: usize,  // Line number.
@@ -28,25 +28,25 @@ pub struct InvalidItem {
 impl InvalidItem {
     /// Initializes a new `InvalidItem`.
     #[must_use]
-    pub const fn new(kind: Validator, file: String, text: String, line: usize) -> Self {
+    pub const fn new(kind: ValidatorKind, file: String, text: String, line: usize) -> Self {
         Self { kind, file, text, line }
     }
 
     pub fn description(&self) -> String {
         match self.kind {
-            Validator::Test => {
+            ValidatorKind::Test => {
                 format!("Invalid test name in {} on line {}: {}", self.file, self.line, self.text)
             }
-            Validator::Constant => {
+            ValidatorKind::Constant => {
                 format!(
                     "Invalid constant or immutable name in {} on line {}: {}",
                     self.file, self.line, self.text
                 )
             }
-            Validator::Script => {
+            ValidatorKind::Script => {
                 format!("Invalid script interface in {}: {}", self.file, self.text)
             }
-            Validator::Src => {
+            ValidatorKind::Src => {
                 format!(
                     "Invalid src method name in {} on line {}: {}",
                     self.file, self.line, self.text

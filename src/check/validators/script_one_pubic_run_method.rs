@@ -1,4 +1,6 @@
-use crate::check::utils::{FileKind, InvalidItem, IsFileKind, Name, Validator, VisibilitySummary};
+use crate::check::utils::{
+    FileKind, InvalidItem, IsFileKind, Name, ValidatorKind, VisibilitySummary,
+};
 use solang_parser::pt::{ContractPart, SourceUnit, SourceUnitPart};
 use std::{error::Error, path::Path};
 
@@ -34,7 +36,7 @@ pub fn validate(
     match public_methods.len() {
         0 => {
             Ok(vec![InvalidItem::new(
-                Validator::Script,
+                ValidatorKind::Script,
                 file.display().to_string(),
                 "No `run` method found".to_string(),
                 0, // This spans multiple lines, so we don't have a line number.
@@ -43,7 +45,7 @@ pub fn validate(
         1 => {
             if public_methods[0] != "run" {
                 Ok(vec![InvalidItem::new(
-                    Validator::Script,
+                    ValidatorKind::Script,
                     file.display().to_string(),
                     "The only public method must be named `run`".to_string(),
                     0,
@@ -54,7 +56,7 @@ pub fn validate(
         }
         _ => {
             Ok(vec![InvalidItem::new(
-              Validator::Script,
+              ValidatorKind::Script,
               file.display().to_string(),
               format!("Scripts must have a single public method named `run` (excluding `setUp`), but the following methods were found: {public_methods:?}"),
               0,
