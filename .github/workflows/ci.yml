@@ -29,6 +29,7 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      - uses: foundry-rs/foundry-toolchain@v1
       - run: cargo test --locked --all-features
 
   lint:
