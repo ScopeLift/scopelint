@@ -1,3 +1,8 @@
+// The `.extension()` method only looks after the last dot in the file name, so it will return
+// Some("sol") for both "Foo.sol" and "Foo.t.sol". This is not what we want here, so we just check
+// extensions manually with `ends_with`.
+#![allow(clippy::case_sensitive_file_extension_comparisons)]
+
 use solang_parser::pt::{
     FunctionAttribute, FunctionDefinition, FunctionTy, SourceUnit, Visibility,
 };
@@ -26,12 +31,12 @@ pub struct InvalidItem {
 }
 
 impl InvalidItem {
-    /// Initializes a new `InvalidItem`.
     #[must_use]
     pub const fn new(kind: ValidatorKind, file: String, text: String, line: usize) -> Self {
         Self { kind, file, text, line }
     }
 
+    #[must_use]
     pub fn description(&self) -> String {
         match self.kind {
             ValidatorKind::Test => {
@@ -143,15 +148,16 @@ pub type ValidatorFn = dyn Fn(&Path, &str, &SourceUnit) -> Result<Vec<InvalidIte
 
 #[derive(Default)]
 pub struct ExpectedFindings {
-    pub script_helper: u32,
-    pub script: u32,
-    pub src: u32,
-    pub test_helper: u32,
-    pub test: u32,
+    pub script_helper: usize,
+    pub script: usize,
+    pub src: usize,
+    pub test_helper: usize,
+    pub test: usize,
 }
 
 impl ExpectedFindings {
-    pub const fn new(expected_findings: u32) -> Self {
+    #[must_use]
+    pub const fn new(expected_findings: usize) -> Self {
         Self {
             script_helper: expected_findings,
             script: expected_findings,
@@ -174,10 +180,10 @@ impl ExpectedFindings {
         let invalid_items_test =
             validate(Path::new("./test/MyContract.t.sol"), content, &pt).unwrap();
 
-        assert_eq!(invalid_items_script_helper.len() as u32, self.script_helper);
-        assert_eq!(invalid_items_script.len() as u32, self.script);
-        assert_eq!(invalid_items_src.len() as u32, self.src);
-        assert_eq!(invalid_items_test_helper.len() as u32, self.test_helper);
-        assert_eq!(invalid_items_test.len() as u32, self.test);
+        assert_eq!(invalid_items_script_helper.len(), self.script_helper);
+        assert_eq!(invalid_items_script.len(), self.script);
+        assert_eq!(invalid_items_src.len(), self.src);
+        assert_eq!(invalid_items_test_helper.len(), self.test_helper);
+        assert_eq!(invalid_items_test.len(), self.test);
     }
 }

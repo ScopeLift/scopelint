@@ -43,15 +43,15 @@ pub fn validate(
             )])
         }
         1 => {
-            if public_methods[0] != "run" {
+            if public_methods[0] == "run" {
+                Ok(Vec::new())
+            } else {
                 Ok(vec![InvalidItem::new(
                     ValidatorKind::Script,
                     file.display().to_string(),
                     "The only public method must be named `run`".to_string(),
                     0,
                 )])
-            } else {
-                Ok(Vec::new())
             }
         }
         _ => {
