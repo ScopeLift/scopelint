@@ -8,6 +8,10 @@ use solang_parser::pt::{
 };
 use std::path::Path;
 
+// =======================================
+// ======== For validator methods ========
+// ===============================-=======
+
 /// The type of validator that found the invalid item.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum ValidatorKind {
@@ -156,6 +160,10 @@ pub fn offset_to_line(content: &str, start: usize) -> usize {
 
     unreachable!("content.len() > start")
 }
+
+// ===========================
+// ======== For tests ========
+// ===========================
 
 #[derive(Default)]
 /// Given the number of expected findings for each file kind, this struct makes it easy to assert

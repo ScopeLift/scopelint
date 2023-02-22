@@ -21,11 +21,6 @@ impl fmt::Display for Report {
 }
 
 impl Report {
-    /// Extends the report with a new invalid item.
-    pub fn add_item(&mut self, item: InvalidItem) {
-        self.invalid_items.push(item);
-    }
-
     /// Extends the report with a list of invalid items.
     pub fn add_items(&mut self, items: Vec<InvalidItem>) {
         self.invalid_items.extend(items);
