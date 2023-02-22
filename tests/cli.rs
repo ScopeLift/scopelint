@@ -38,6 +38,7 @@ fn test_check_proj1_all_findings() {
         "Invalid src method name in ./src/Counter.sol on line 25: privateShouldHaveLeadingUnderscore",
         "Invalid test name in ./test/Counter.t.sol on line 16: testIncrementBadName",
         "error: Convention checks failed, see details above",
+        "error: Formatting validation failed, run `scopelint fmt` to fix",
         "",
     ];
 

@@ -28,3 +28,4 @@ contract Counter {
     number += 1000;
   }
 }
+

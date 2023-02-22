@@ -1,18 +1,15 @@
 #![doc = include_str!("../README.md")]
 #![warn(missing_docs, unreachable_pub, unused, rust_2021_compatibility)]
 #![warn(clippy::all, clippy::pedantic, clippy::cargo, clippy::nursery)]
-use colored::Colorize;
-use std::{env, process};
+#![allow(clippy::multiple_crate_versions)]
+use clap::Parser;
+use scopelint::config::Opts;
+use std::process;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let opts = Opts::parse();
 
-    let config = scopelint::config::Config::build(&args).unwrap_or_else(|err| {
-        eprintln!("{}: Argument parsing failed with '{err}'", "error".bold().red());
-        process::exit(1);
-    });
-
-    if let Err(_err) = scopelint::run(&config) {
+    if let Err(_err) = scopelint::run(&opts) {
         // All warnings/errors have already been logged.
         process::exit(1);
     }
