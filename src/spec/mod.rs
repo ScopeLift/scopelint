@@ -3,7 +3,7 @@ use colored::Colorize;
 use solang_parser::pt::{
     ContractDefinition, ContractPart, ContractTy, FunctionDefinition, FunctionTy, SourceUnitPart,
 };
-use std::{cmp::Ordering, collections::HashMap, error::Error, ffi::OsStr, fmt, fs, path::Path};
+use std::{collections::HashMap, error::Error, ffi::OsStr, fs, path::Path};
 use walkdir::WalkDir;
 
 /// Generates a specification for the current project from test names.
@@ -33,7 +33,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             continue
         }
 
-        let new_src_contracts = parse_contracts(&file);
+        let new_src_contracts = parse_contracts(file);
 
         for (contract_name, contract) in new_src_contracts {
             src_contracts.insert(contract_name, contract);
@@ -55,13 +55,13 @@ pub fn run() -> Result<(), Box<dyn Error>> {
             continue
         }
 
-        let new_test_contracts = parse_contracts(&file);
+        let new_test_contracts = parse_contracts(file);
         let mut new_test_contracts_vec: Vec<ParsedContract> = Vec::new();
         for (contract_name, contract) in new_test_contracts {
             test_contracts.insert(contract_name, contract.clone());
             new_test_contracts_vec.push(contract);
         }
-        test_contract_files.insert(contract_name_from_file(&file), new_test_contracts_vec);
+        test_contract_files.insert(contract_name_from_file(file), new_test_contracts_vec);
     }
 
     // Debug.
@@ -194,7 +194,7 @@ struct SpecResults {
 }
 
 impl SpecResults {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self { test_contracts: Vec::new() }
     }
 
@@ -209,38 +209,36 @@ impl SpecResults {
 
         println!("{}", "Protocol Specification".cyan().bold());
         for item in sorted_test_contracts {
-            println!("{}.{}()", item.src_contract.contract_name, item.src_contract_function.name());
+            let fn_name = item.src_contract_function.name();
+            println!("\n{}.{}()", item.src_contract.contract_name, fn_name);
 
             // Remove everything before, and including, the first underscore.
             let trimmed_test_names = item.tests.iter().map(|test| {
                 let fn_name = test.name();
-                let trimmed_fn_name_opt = fn_name.splitn(2, '_').nth(1);
-                if let Some(trimmed_fn_name) = trimmed_fn_name_opt {
-                    trimmed_fn_name.to_string()
-                } else {
-                    // fn_name.to_string()
-                    panic!("bad test name: {}", fn_name);
-                }
+                let trimmed_fn_name_opt = fn_name.split_once('_').map(|x| x.1);
+                trimmed_fn_name_opt.map_or_else(
+                    || panic!("bad test name: {fn_name}"),
+                    std::string::ToString::to_string,
+                )
             });
 
             for trimmed_fn_name in trimmed_test_names {
                 // Replace underscores with colons, and camel case with spaces.
                 let requirement =
                     trimmed_fn_name
-                        .replace("_", ": ")
+                        .replace('_', ": ")
                         .chars()
                         .enumerate()
                         .map(|(i, c)| {
                             if i > 0 && c.is_uppercase() {
-                                format!(" {}", c)
+                                format!(" {c}")
                             } else {
                                 c.to_string()
                             }
                         })
                         .collect::<String>();
-                println!("  {}", requirement);
+                println!("  {requirement}");
             }
-            println!("");
         }
     }
 }
