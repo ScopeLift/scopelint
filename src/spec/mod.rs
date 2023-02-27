@@ -54,7 +54,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     // ======================================
 
     // Next we do the same thing for all test contracts.
-    for result in WalkDir::new("./tests") {
+    for result in WalkDir::new("./test") {
         let dent = match result {
             Ok(dent) => dent,
             Err(err) => {
