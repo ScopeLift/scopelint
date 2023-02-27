@@ -1,23 +1,35 @@
+// The `.extension()` method only looks after the last dot in the file name, so it will return
+// Some("sol") for both "Foo.sol" and "Foo.t.sol". This is not what we want here, so we just check
+// extensions manually with `ends_with`.
+#![allow(clippy::case_sensitive_file_extension_comparisons)]
+
 use crate::check::utils::{Name, VisibilitySummary};
 use colored::Colorize;
 use solang_parser::pt::{
-    ContractDefinition, ContractPart, ContractTy, FunctionDefinition, FunctionTy, SourceUnitPart,
+    ContractDefinition, ContractPart, ContractTy, FunctionDefinition, SourceUnitPart,
 };
-use std::{collections::HashMap, error::Error, ffi::OsStr, fs, path::Path};
+use std::{
+    error::Error,
+    ffi::OsStr,
+    fs,
+    path::{Path, PathBuf},
+};
 use walkdir::WalkDir;
 
 /// Generates a specification for the current project from test names.
 /// # Errors
 /// Returns an error if the specification could not be generated from the Solidity code.
+/// # Panics
+/// Panics when a file path could not be unwrapped.
 pub fn run() -> Result<(), Box<dyn Error>> {
     // ========================================
     // ======== Parse source contracts ========
     // ========================================
+
     // First, parse all source files and collect the contracts and their methods. All free functions
     // are added under a special contract called `FreeFunctions`.
-    let mut src_contracts: HashMap<String, ParsedContract> = HashMap::new();
-    let mut test_contracts: HashMap<String, ParsedContract> = HashMap::new();
-    let mut test_contract_files: HashMap<String, Vec<ParsedContract>> = HashMap::new();
+    let mut src_contracts: Vec<ParsedContract> = Vec::new();
+    let mut test_contracts: Vec<ParsedContract> = Vec::new();
 
     for result in WalkDir::new("./src") {
         let dent = match result {
@@ -34,11 +46,12 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
 
         let new_src_contracts = parse_contracts(file);
-
-        for (contract_name, contract) in new_src_contracts {
-            src_contracts.insert(contract_name, contract);
-        }
+        src_contracts.extend(new_src_contracts);
     }
+
+    // ======================================
+    // ======== Parse Test contracts ========
+    // ======================================
 
     // Next we do the same thing for all test contracts.
     for result in WalkDir::new("./tests") {
@@ -56,110 +69,44 @@ pub fn run() -> Result<(), Box<dyn Error>> {
         }
 
         let new_test_contracts = parse_contracts(file);
-        let mut new_test_contracts_vec: Vec<ParsedContract> = Vec::new();
-        for (contract_name, contract) in new_test_contracts {
-            test_contracts.insert(contract_name, contract.clone());
-            new_test_contracts_vec.push(contract);
-        }
-        test_contract_files.insert(contract_name_from_file(file), new_test_contracts_vec);
+        test_contracts.extend(new_test_contracts);
     }
 
-    // Debug.
-    // for (contract_name, contract) in src_contracts {
-    //     println!("contract {:?} has {:?} functions", contract_name, contract.functions.len());
-    // }
-    // for (contract_name, contract) in test_contracts {
-    //     println!("contract {:?} has {:?} functions", contract_name, contract.functions.len());
-    // }
+    // ========================================
+    // ======== Generate Specification ========
+    // ========================================
 
+    // Now we generate contract specifications from the test contracts.
     // Assumptions:
     //   - The name of a test contract file matches the name of the contract it tests.
     //   - Contracts that have names matching a function name in the source contract contain that
     //     method's tests/specification.
-    let mut results: SpecResults = SpecResults::new();
-    for (contract_name, test_contracts) in test_contract_files {
-        // If there is no source contract with the same name, skip this test contract.
-        if let Some(src_contract) = src_contracts.get(&contract_name) {
-            for test_contract in test_contracts {
-                // Look for the name of a function in the `src_contract` that matches the name of
-                // the test contract.
-                if let Some(src_contract_function) = src_contract.functions.iter().find(|f| {
-                    f.name().to_ascii_lowercase() ==
-                        test_contract.contract_name.to_ascii_lowercase()
-                }) {
-                    // Filter out internal/private functions, constructor, fallback/receive, and
-                    // setUp.
-                    let test_contract_spec_fns = test_contract
-                        .functions
-                        .iter()
-                        .filter(|f| {
-                            !f.is_internal_or_private() &&
-                                f.name() != "setUp" &&
-                                f.ty == FunctionTy::Function
-                        })
-                        .cloned()
-                        .collect::<Vec<FunctionDefinition>>();
-                    results.push_item(TestContract {
-                        contract_name: test_contract.contract_name,
-                        src_contract: src_contract.clone(),
-                        src_contract_function: src_contract_function.clone(),
-                        tests: test_contract_spec_fns,
-                    });
-                }
+    let mut protocol_spec = ProtocolSpecification::new();
+
+    for src_contract in src_contracts {
+        let mut contract_specification = ContractSpecification::new(src_contract.clone());
+        let src_contract_name = src_contract.contract.unwrap().name.name;
+
+        for test_contract in &test_contracts {
+            // If the name of the source contract matches the file name of the test contract, add
+            // the test contract.
+            if src_contract_name == test_contract.contract_name_from_file() {
+                contract_specification.push_test_contract(test_contract.clone());
             }
         }
+
+        protocol_spec.push_contract_specification(contract_specification);
     }
 
-    results.print_summary();
+    protocol_spec.print_summary();
 
     Ok(())
 }
 
-fn contract_name_from_file(file: &Path) -> String {
-    let file_stem = file.file_stem().unwrap().to_str().unwrap().to_string();
-    file_stem[0..file_stem.len() - 2].to_string() // Slice off the ".t" at the end.
-}
-
-fn parse_contracts(file: &Path) -> HashMap<String, ParsedContract> {
-    let content = fs::read_to_string(file).unwrap();
-    let (pt, _comments) = solang_parser::parse(&content, 0).expect("Parsing failed");
-    let mut contracts: HashMap<String, ParsedContract> = HashMap::new();
-
-    for element in &pt.0 {
-        match element {
-            SourceUnitPart::FunctionDefinition(f) => {
-                // These are free functions not belonging to any contract.
-                contracts
-                    .entry("FreeFunctions".to_string())
-                    .or_insert_with(|| ParsedContract::new("FreeFunctions".to_string(), None))
-                    .push_item(*f.clone());
-            }
-            SourceUnitPart::ContractDefinition(c) => {
-                if let ContractTy::Interface(_) = c.ty {
-                    continue
-                }
-
-                for el in &c.parts {
-                    if let ContractPart::FunctionDefinition(f) = el {
-                        contracts
-                            .entry(c.name.name.clone())
-                            .or_insert_with(|| {
-                                ParsedContract::new(c.name.name.clone(), Some(*c.clone()))
-                            })
-                            .push_item(*f.clone());
-                    }
-                }
-            }
-            _ => (),
-        }
-    }
-    contracts
-}
-
 #[derive(Clone)]
 struct ParsedContract {
-    // Name of the source contract.
-    contract_name: String,
+    // Path to the source file.
+    path: PathBuf,
     // The contract item.
     contract: Option<ContractDefinition>,
     // All functions present in the source contract.
@@ -167,78 +114,144 @@ struct ParsedContract {
 }
 
 impl ParsedContract {
-    const fn new(contract_name: String, contract: Option<ContractDefinition>) -> Self {
-        Self { contract_name, contract, functions: Vec::new() }
+    fn new(path: PathBuf, contract: Option<ContractDefinition>) -> Self {
+        // TODO Clippy bug giving false redundant_closure warning.
+        #[allow(clippy::redundant_closure)]
+        let functions = contract.as_ref().map_or_else(|| Vec::new(), get_functions_from_contract);
+        Self { path, contract, functions }
     }
 
-    fn push_item(&mut self, function: FunctionDefinition) {
-        self.functions.push(function);
+    fn contract_name(&self) -> String {
+        self.contract.as_ref().map_or_else(|| "FreeFunctions".to_string(), |c| c.name.name.clone())
+    }
+
+    fn contract_name_from_file(&self) -> String {
+        let file_stem = self.path.file_stem().unwrap().to_str().unwrap().to_string();
+        if file_stem.ends_with(".t") {
+            file_stem[0..file_stem.len() - 2].to_string() // Slice off the ".t" at the end.
+        } else {
+            file_stem
+        }
     }
 }
 
-// #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
-#[derive(Clone)]
-struct TestContract {
-    // Name of the test contract.
-    contract_name: String,
-    // Associated source contract for this test contract.
+struct ContractSpecification {
     src_contract: ParsedContract,
-    // The function in the source contract that is being tested.
-    src_contract_function: FunctionDefinition,
-    // All tests in this contract, which form the specification for the function.
-    tests: Vec<FunctionDefinition>,
+    test_contracts: Vec<ParsedContract>,
 }
 
-struct SpecResults {
-    test_contracts: Vec<TestContract>,
-}
-
-impl SpecResults {
-    const fn new() -> Self {
-        Self { test_contracts: Vec::new() }
+impl ContractSpecification {
+    const fn new(src_contract: ParsedContract) -> Self {
+        Self { src_contract, test_contracts: Vec::new() }
     }
 
-    fn push_item(&mut self, test_contract: TestContract) {
+    fn push_test_contract(&mut self, test_contract: ParsedContract) {
         self.test_contracts.push(test_contract);
     }
 
-    fn print_summary(&self) {
-        let mut sorted_test_contracts = self.test_contracts.clone();
-        sorted_test_contracts
-            .sort_by(|a, b| a.src_contract.contract_name.cmp(&b.src_contract.contract_name));
+    fn print_specification(&self) {
+        let prefix = format!("\n{}", "Contract Specification:".bold());
+        let contract_name = format!("{}", self.src_contract.contract_name().bold());
+        println!("{prefix} {contract_name}");
 
-        println!("{}", "Protocol Specification".cyan().bold());
-        for item in sorted_test_contracts {
-            let fn_name = item.src_contract_function.name();
-            println!("\n{}.{}()", item.src_contract.contract_name, fn_name);
-
-            // Remove everything before, and including, the first underscore.
-            let trimmed_test_names = item.tests.iter().map(|test| {
-                let fn_name = test.name();
-                let trimmed_fn_name_opt = fn_name.split_once('_').map(|x| x.1);
-                trimmed_fn_name_opt.map_or_else(
-                    || panic!("bad test name: {fn_name}"),
-                    std::string::ToString::to_string,
-                )
+        // Vectors of functions are already sorted by their order of appearance in the source code,
+        // which is the order we want to print in.
+        for src_fn in &self.src_contract.functions {
+            // Find the test contract with the same name
+            let test_contract = self.test_contracts.iter().find(|tc| {
+                tc.contract_name().to_ascii_lowercase() == src_fn.name().to_ascii_lowercase()
             });
 
-            for trimmed_fn_name in trimmed_test_names {
-                // Replace underscores with colons, and camel case with spaces.
-                let requirement =
-                    trimmed_fn_name
-                        .replace('_', ": ")
-                        .chars()
-                        .enumerate()
-                        .map(|(i, c)| {
-                            if i > 0 && c.is_uppercase() {
-                                format!(" {c}")
-                            } else {
-                                c.to_string()
-                            }
-                        })
-                        .collect::<String>();
-                println!("  {requirement}");
-            }
+            test_contract.map_or_else(
+                || println!("  {}", src_fn.name().red()),
+                |test_contract| {
+                    println!("  {}", src_fn.name());
+                    // Print the names of each function
+                    for f in &test_contract.functions {
+                        let is_test_fn = f.is_public_or_external() && f.name().starts_with("test");
+                        if !is_test_fn {
+                            continue
+                        }
+
+                        // Remove everything before, and including, the first underscore.
+                        let fn_name = f.name();
+                        let trimmed_fn_name_opt = fn_name.split_once('_').map(|x| x.1);
+                        if let Some(trimmed_fn_name) = trimmed_fn_name_opt {
+                            // Replace underscores with colons, and camel case with spaces.
+                            let requirement = trimmed_fn_name_to_requirement(trimmed_fn_name);
+                            println!("    {requirement}");
+                        }
+                    }
+                },
+            );
         }
     }
+}
+
+struct ProtocolSpecification {
+    contract_specifications: Vec<ContractSpecification>,
+}
+
+impl ProtocolSpecification {
+    const fn new() -> Self {
+        Self { contract_specifications: Vec::new() }
+    }
+
+    fn push_contract_specification(&mut self, contract_specification: ContractSpecification) {
+        self.contract_specifications.push(contract_specification);
+    }
+
+    fn print_summary(&self) {
+        for contract_specification in &self.contract_specifications {
+            contract_specification.print_specification();
+        }
+    }
+}
+
+// ==================================
+// ======== Helper functions ========
+// ==================================
+
+fn parse_contracts(file: &Path) -> Vec<ParsedContract> {
+    let content = fs::read_to_string(file).unwrap();
+    let (pt, _comments) = solang_parser::parse(&content, 0).expect("Parsing failed");
+    let mut contracts: Vec<ParsedContract> = Vec::new();
+
+    for element in &pt.0 {
+        match element {
+            SourceUnitPart::FunctionDefinition(_f) => {
+                // These are free functions not belonging to any contract.
+                todo!("Free functions not yet supported.");
+            }
+            SourceUnitPart::ContractDefinition(c) => {
+                if let ContractTy::Interface(_) = c.ty {
+                    continue
+                }
+
+                contracts.push(ParsedContract::new(file.to_path_buf(), Some(*c.clone())));
+            }
+            _ => (),
+        }
+    }
+    contracts
+}
+
+fn get_functions_from_contract(contract: &ContractDefinition) -> Vec<FunctionDefinition> {
+    let mut functions = Vec::new();
+    for element in &contract.parts {
+        if let ContractPart::FunctionDefinition(f) = element {
+            functions.push(*f.clone());
+        }
+    }
+    functions
+}
+
+fn trimmed_fn_name_to_requirement(trimmed_fn_name: &str) -> String {
+    // Replace underscores with colons, and camel case with spaces.
+    trimmed_fn_name
+        .replace('_', ": ")
+        .chars()
+        .enumerate()
+        .map(|(i, c)| if i > 0 && c.is_uppercase() { format!(" {c}") } else { c.to_string() })
+        .collect::<String>()
 }
