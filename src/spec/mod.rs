@@ -156,22 +156,38 @@ impl ContractSpecification {
 
         // Vectors of functions are already sorted by their order of appearance in the source code,
         // which is the order we want to print in.
-        for src_fn in &self.src_contract.functions {
+        let src_fns = &self.src_contract.functions;
+        let num_src_fns = src_fns.len();
+        for (i, src_fn) in src_fns.iter().enumerate() {
             // Find the test contract with the same name
             let test_contract = self.test_contracts.iter().find(|tc| {
                 tc.contract_name().to_ascii_lowercase() == src_fn.name().to_ascii_lowercase()
             });
 
+            let src_fn_name_prefix = if i == num_src_fns - 1 { "└── " } else { "├── " };
+
             test_contract.map_or_else(
-                || println!("  {}", src_fn.name().red()),
+                || println!("{src_fn_name_prefix}{}", src_fn.name().red()),
                 |test_contract| {
-                    println!("  {}", src_fn.name());
-                    // Print the names of each function
-                    for f in &test_contract.functions {
+                    println!("{src_fn_name_prefix}{}", src_fn.name());
+
+                    let test_fns = &test_contract.functions;
+                    let num_test_fns = test_fns.len();
+                    for (j, f) in test_fns.iter().enumerate() {
                         let is_test_fn = f.is_public_or_external() && f.name().starts_with("test");
                         if !is_test_fn {
                             continue
                         }
+
+                        let test_fn_name_prefix = if i < num_src_fns - 1 && j == num_test_fns - 1 {
+                            "│   └── "
+                        } else if i < num_src_fns - 1 {
+                            "│   ├── "
+                        } else if j == num_test_fns - 1 {
+                            "    └── "
+                        } else {
+                            "    ├── "
+                        };
 
                         // Remove everything before, and including, the first underscore.
                         let fn_name = f.name();
@@ -179,7 +195,7 @@ impl ContractSpecification {
                         if let Some(trimmed_fn_name) = trimmed_fn_name_opt {
                             // Replace underscores with colons, and camel case with spaces.
                             let requirement = trimmed_fn_name_to_requirement(trimmed_fn_name);
-                            println!("    {requirement}");
+                            println!("{test_fn_name_prefix}{requirement}");
                         }
                     }
                 },
@@ -249,9 +265,9 @@ fn get_functions_from_contract(contract: &ContractDefinition) -> Vec<FunctionDef
 fn trimmed_fn_name_to_requirement(trimmed_fn_name: &str) -> String {
     // Replace underscores with colons, and camel case with spaces.
     trimmed_fn_name
-        .replace('_', ": ")
+        .replace('_', ":")
         .chars()
         .enumerate()
-        .map(|(i, c)| if i > 0 && c.is_uppercase() { format!(" {c}") } else { c.to_string() })
+        .map(|(_i, c)| if c.is_uppercase() { format!(" {c}") } else { c.to_string() })
         .collect::<String>()
 }
