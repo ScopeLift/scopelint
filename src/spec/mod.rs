@@ -43,6 +43,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     for src_contract in src_contracts {
         let mut contract_specification = ContractSpecification::new(src_contract.clone());
         let src_contract_name = src_contract.contract.unwrap().name.name;
+
         for test_contract in &test_contracts {
             if src_contract_name == test_contract.contract_name_from_file() {
                 contract_specification.push_test_contract(test_contract.clone());
@@ -57,11 +58,11 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
 #[derive(Clone)]
 struct ParsedContract {
-    // Path to the source file.
+    // Path to the contract file.
     path: PathBuf,
-    // The contract item.
+    // The contract item, or `None` for free functions.
     contract: Option<ContractDefinition>,
-    // All functions present in the source contract.
+    // All functions present in the contract.
     functions: Vec<FunctionDefinition>,
 }
 
@@ -72,7 +73,7 @@ impl ParsedContract {
     }
 
     fn contract_name(&self) -> String {
-        self.contract.as_ref().map_or_else(|| "FreeFunctions".to_string(), |c| c.name.name.clone())
+        self.contract.as_ref().map_or("FreeFunctions".to_string(), |c| c.name.name.clone())
     }
 
     fn contract_name_from_file(&self) -> String {
@@ -116,6 +117,9 @@ impl ContractSpecification {
 
             let src_fn_name_prefix = if i == num_src_fns - 1 { "└── " } else { "├── " };
 
+            // If there's no matching test contract, print the name of the source function in red to
+            // indicate to the user that it is missing tests to define it's  requirements.
+            // Otherwise, parse the test names into a specification and print it.
             test_contract.map_or_else(
                 || println!("{src_fn_name_prefix}{}", src_fn.name().red()),
                 |test_contract| {
@@ -142,8 +146,11 @@ impl ContractSpecification {
                         // Remove everything before, and including, the first underscore.
                         let fn_name = f.name();
                         let trimmed_fn_name_opt = fn_name.split_once('_').map(|x| x.1);
+
+                        // If there were no underscores present this is an invalid test name, so we
+                        // print nothing. The user should use `scopelint check` to make sure all
+                        // test names are valid. Otherwise, parse and print the requirement.
                         if let Some(trimmed_fn_name) = trimmed_fn_name_opt {
-                            // Replace underscores with colons, and camel case with spaces.
                             let requirement = trimmed_fn_name_to_requirement(trimmed_fn_name);
                             println!("{test_fn_name_prefix}{requirement}");
                         }
@@ -197,7 +204,6 @@ fn get_contracts_for_dir<P: AsRef<Path>>(dir: P, extension: &str) -> Vec<ParsedC
         let new_contracts = parse_contracts(file);
         contracts.extend(new_contracts);
     }
-
     contracts
 }
 
