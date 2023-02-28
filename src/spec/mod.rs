@@ -27,7 +27,6 @@ pub fn run() -> Result<(), Box<dyn Error>> {
 
     // First, parse all source and test files to collect the contracts and their methods. All free
     // functions are added under a special contract called `FreeFunctions`.
-
     let src_contracts = get_contracts_for_dir("./src", ".sol");
     let test_contracts = get_contracts_for_dir("./test", ".t.sol");
 
