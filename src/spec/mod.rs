@@ -10,7 +10,6 @@ use solang_parser::pt::{
 };
 use std::{
     error::Error,
-    ffi::OsStr,
     fs,
     path::{Path, PathBuf},
 };
@@ -22,55 +21,15 @@ use walkdir::WalkDir;
 /// # Panics
 /// Panics when a file path could not be unwrapped.
 pub fn run() -> Result<(), Box<dyn Error>> {
-    // ========================================
-    // ======== Parse source contracts ========
-    // ========================================
+    // =================================
+    // ======== Parse contracts ========
+    // =================================
 
-    // First, parse all source files and collect the contracts and their methods. All free functions
-    // are added under a special contract called `FreeFunctions`.
-    let mut src_contracts: Vec<ParsedContract> = Vec::new();
-    let mut test_contracts: Vec<ParsedContract> = Vec::new();
+    // First, parse all source and test files to collect the contracts and their methods. All free
+    // functions are added under a special contract called `FreeFunctions`.
 
-    for result in WalkDir::new("./src") {
-        let dent = match result {
-            Ok(dent) => dent,
-            Err(err) => {
-                eprintln!("{err}");
-                continue
-            }
-        };
-
-        let file = dent.path();
-        if !dent.file_type().is_file() || file.extension() != Some(OsStr::new("sol")) {
-            continue
-        }
-
-        let new_src_contracts = parse_contracts(file);
-        src_contracts.extend(new_src_contracts);
-    }
-
-    // ======================================
-    // ======== Parse Test contracts ========
-    // ======================================
-
-    // Next we do the same thing for all test contracts.
-    for result in WalkDir::new("./test") {
-        let dent = match result {
-            Ok(dent) => dent,
-            Err(err) => {
-                eprintln!("{err}");
-                continue
-            }
-        };
-
-        let file = dent.path();
-        if !dent.file_type().is_file() || !dent.path().to_str().unwrap().ends_with(".t.sol") {
-            continue
-        }
-
-        let new_test_contracts = parse_contracts(file);
-        test_contracts.extend(new_test_contracts);
-    }
+    let src_contracts = get_contracts_for_dir("./src", ".sol");
+    let test_contracts = get_contracts_for_dir("./test", ".t.sol");
 
     // ========================================
     // ======== Generate Specification ========
@@ -79,25 +38,19 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     // Now we generate contract specifications from the test contracts.
     // Assumptions:
     //   - The name of a test contract file matches the name of the contract it tests.
-    //   - Contracts that have names matching a function name in the source contract contain that
-    //     method's tests/specification.
+    //   - If the name of a test contract matches a function name in the source contract, that test
+    //     contract contains that source method's tests/specification.
     let mut protocol_spec = ProtocolSpecification::new();
-
     for src_contract in src_contracts {
         let mut contract_specification = ContractSpecification::new(src_contract.clone());
         let src_contract_name = src_contract.contract.unwrap().name.name;
-
         for test_contract in &test_contracts {
-            // If the name of the source contract matches the file name of the test contract, add
-            // the test contract.
             if src_contract_name == test_contract.contract_name_from_file() {
                 contract_specification.push_test_contract(test_contract.clone());
             }
         }
-
         protocol_spec.push_contract_specification(contract_specification);
     }
-
     protocol_spec.print_summary();
 
     Ok(())
@@ -115,9 +68,7 @@ struct ParsedContract {
 
 impl ParsedContract {
     fn new(path: PathBuf, contract: Option<ContractDefinition>) -> Self {
-        // TODO Clippy bug giving false redundant_closure warning.
-        #[allow(clippy::redundant_closure)]
-        let functions = contract.as_ref().map_or_else(|| Vec::new(), get_functions_from_contract);
+        let functions = contract.as_ref().map_or(Vec::new(), get_functions_from_contract);
         Self { path, contract, functions }
     }
 
@@ -227,6 +178,29 @@ impl ProtocolSpecification {
 // ==================================
 // ======== Helper functions ========
 // ==================================
+
+fn get_contracts_for_dir<P: AsRef<Path>>(dir: P, extension: &str) -> Vec<ParsedContract> {
+    let mut contracts: Vec<ParsedContract> = Vec::new();
+    for result in WalkDir::new(dir) {
+        let dent = match result {
+            Ok(dent) => dent,
+            Err(err) => {
+                eprintln!("{err}");
+                continue
+            }
+        };
+
+        let file = dent.path();
+        if !dent.file_type().is_file() || !dent.path().to_str().unwrap().ends_with(extension) {
+            continue
+        }
+
+        let new_contracts = parse_contracts(file);
+        contracts.extend(new_contracts);
+    }
+
+    contracts
+}
 
 fn parse_contracts(file: &Path) -> Vec<ParsedContract> {
     let content = fs::read_to_string(file).unwrap();
