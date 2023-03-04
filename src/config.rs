@@ -18,4 +18,7 @@ pub enum Subcommands {
     #[clap(about = "Formats Solidity and TOML files in the codebase.")]
     /// Formats Solidity and TOML files in the codebase.
     Fmt,
+    #[clap(about = "Generates a specification for the current project from test names.")]
+    /// Generates a specification for the current project from test names.
+    Spec,
 }

@@ -20,7 +20,7 @@ fn run_scopelint(test_folder: &str) -> Output {
 
 #[test]
 fn test_check_proj1_all_findings() {
-    let output = run_scopelint("proj1-AllFindings");
+    let output = run_scopelint("check-proj1-AllFindings");
     let stderr = String::from_utf8(output.stderr).unwrap();
     let findings: Vec<&str> = stderr.split("\n").collect();
 
@@ -50,7 +50,7 @@ fn test_check_proj1_all_findings() {
 
 #[test]
 fn test_check_proj2_no_findings() {
-    let output = run_scopelint("proj2-NoFindings");
+    let output = run_scopelint("check-proj2-NoFindings");
     let stderr = String::from_utf8(output.stderr).unwrap();
     let findings: Vec<&str> = stderr.split("\n").collect();
 
