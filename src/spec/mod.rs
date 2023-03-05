@@ -42,7 +42,7 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     let mut protocol_spec = ProtocolSpecification::new();
     for src_contract in src_contracts {
         let mut contract_specification = ContractSpecification::new(src_contract.clone());
-        let src_contract_name = src_contract.contract.unwrap().name.name;
+        let src_contract_name = src_contract.contract.unwrap().name.unwrap().name;
 
         for test_contract in &test_contracts {
             if src_contract_name == test_contract.contract_name_from_file() {
@@ -73,7 +73,9 @@ impl ParsedContract {
     }
 
     fn contract_name(&self) -> String {
-        self.contract.as_ref().map_or("FreeFunctions".to_string(), |c| c.name.name.clone())
+        self.contract
+            .as_ref()
+            .map_or("FreeFunctions".to_string(), |c| c.name.as_ref().unwrap().name.clone())
     }
 
     fn contract_name_from_file(&self) -> String {

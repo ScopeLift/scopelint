@@ -53,7 +53,7 @@ fn validate_name(file: &Path, content: &str, v: &VariableDefinition) -> Option<I
         .attrs
         .iter()
         .any(|a| matches!(a, VariableAttribute::Constant(_) | VariableAttribute::Immutable(_)));
-    let name = &v.name.name;
+    let name = &v.name.as_ref().unwrap().name;
 
     if is_constant && !is_valid_constant_name(name) {
         Some(InvalidItem::new(
