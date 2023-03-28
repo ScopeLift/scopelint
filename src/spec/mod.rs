@@ -112,53 +112,58 @@ impl ContractSpecification {
         let src_fns = &self.src_contract.functions;
         let num_src_fns = src_fns.len();
         for (i, src_fn) in src_fns.iter().enumerate() {
-            // Find the test contract with the same name
-            let test_contract = self.test_contracts.iter().find(|tc| {
-                tc.contract_name().to_ascii_lowercase() == src_fn.name().to_ascii_lowercase()
-            });
-
             let src_fn_name_prefix = if i == num_src_fns - 1 { "└── " } else { "├── " };
 
-            // If there's no matching test contract, print the name of the source function in red to
-            // indicate to the user that it is missing tests to define it's  requirements.
-            // Otherwise, parse the test names into a specification and print it.
-            test_contract.map_or_else(
-                || println!("{src_fn_name_prefix}{}", src_fn.name().red()),
-                |test_contract| {
-                    println!("{src_fn_name_prefix}{}", src_fn.name());
+            self.test_contracts
+                .iter()
+                .find(|tc| {
+                    // Find the test contract with the same name
+                    tc.contract_name().to_ascii_lowercase() == src_fn.name().to_ascii_lowercase()
+                })
+                .map_or_else(
+                    // If there's no matching test contract, print the name of the source function
+                    // in red to indicate to the user that it is missing tests
+                    // to define it's requirements. Otherwise, parse the test
+                    // names into a specification and print it.
+                    || println!("{src_fn_name_prefix}{}", src_fn.name().red()),
+                    |test_contract| {
+                        println!("{src_fn_name_prefix}{}", src_fn.name());
 
-                    let test_fns = &test_contract.functions;
-                    let num_test_fns = test_fns.len();
-                    for (j, f) in test_fns.iter().enumerate() {
-                        let is_test_fn = f.is_public_or_external() && f.name().starts_with("test");
-                        if !is_test_fn {
-                            continue
+                        let test_fns = &test_contract.functions;
+                        let num_test_fns = test_fns.len();
+                        for (j, f) in test_fns.iter().enumerate() {
+                            let is_test_fn =
+                                f.is_public_or_external() && f.name().starts_with("test");
+                            if !is_test_fn {
+                                continue
+                            }
+
+                            let test_fn_name_prefix =
+                                if i < num_src_fns - 1 && j == num_test_fns - 1 {
+                                    "│   └── "
+                                } else if i < num_src_fns - 1 {
+                                    "│   ├── "
+                                } else if j == num_test_fns - 1 {
+                                    "    └── "
+                                } else {
+                                    "    ├── "
+                                };
+
+                            // Remove everything before, and including, the first underscore.
+                            let fn_name = f.name();
+                            let trimmed_fn_name_opt = fn_name.split_once('_').map(|x| x.1);
+
+                            // If there were no underscores present this is an invalid test name, so
+                            // we print nothing. The user should use `scopelint check` to make sure
+                            // all test names are valid. Otherwise, parse and print the
+                            // requirement.
+                            if let Some(trimmed_fn_name) = trimmed_fn_name_opt {
+                                let requirement = trimmed_fn_name_to_requirement(trimmed_fn_name);
+                                println!("{test_fn_name_prefix}{requirement}");
+                            }
                         }
-
-                        let test_fn_name_prefix = if i < num_src_fns - 1 && j == num_test_fns - 1 {
-                            "│   └── "
-                        } else if i < num_src_fns - 1 {
-                            "│   ├── "
-                        } else if j == num_test_fns - 1 {
-                            "    └── "
-                        } else {
-                            "    ├── "
-                        };
-
-                        // Remove everything before, and including, the first underscore.
-                        let fn_name = f.name();
-                        let trimmed_fn_name_opt = fn_name.split_once('_').map(|x| x.1);
-
-                        // If there were no underscores present this is an invalid test name, so we
-                        // print nothing. The user should use `scopelint check` to make sure all
-                        // test names are valid. Otherwise, parse and print the requirement.
-                        if let Some(trimmed_fn_name) = trimmed_fn_name_opt {
-                            let requirement = trimmed_fn_name_to_requirement(trimmed_fn_name);
-                            println!("{test_fn_name_prefix}{requirement}");
-                        }
-                    }
-                },
-            );
+                    },
+                );
         }
     }
 }
