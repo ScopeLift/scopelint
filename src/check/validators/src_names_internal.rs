@@ -1,7 +1,7 @@
 use crate::check::utils::{
     offset_to_line, FileKind, InvalidItem, IsFileKind, Name, ValidatorKind, VisibilitySummary,
 };
-use solang_parser::pt::{ContractPart, FunctionDefinition, SourceUnit, SourceUnitPart};
+use solang_parser::pt::{ContractPart, ContractTy, FunctionDefinition, SourceUnit, SourceUnitPart};
 use std::path::Path;
 
 fn is_matching_file(file: &Path) -> bool {
@@ -23,15 +23,18 @@ pub fn validate(file: &Path, content: &str, pt: &SourceUnit) -> Vec<InvalidItem>
                     invalid_items.push(invalid_item);
                 }
             }
-            SourceUnitPart::ContractDefinition(c) => {
-                for el in &c.parts {
-                    if let ContractPart::FunctionDefinition(f) = el {
-                        if let Some(invalid_item) = validate_name(file, content, f) {
-                            invalid_items.push(invalid_item);
+            SourceUnitPart::ContractDefinition(c) => match c.ty {
+                ContractTy::Library(_) => continue,
+                _ => {
+                    for el in &c.parts {
+                        if let ContractPart::FunctionDefinition(f) = el {
+                            if let Some(invalid_item) = validate_name(file, content, f) {
+                                invalid_items.push(invalid_item);
+                            }
                         }
                     }
                 }
-            }
+            },
             _ => (),
         }
     }
