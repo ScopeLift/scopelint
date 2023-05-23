@@ -6,7 +6,7 @@
   license = "MIT"
   name = "scopelint"
   repository = "https://github.com/ScopeLift/scopelint"
-  version = "0.0.17"
+  version = "0.0.18"
   include = ["/src"]
 
 [dependencies]
