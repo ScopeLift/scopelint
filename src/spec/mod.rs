@@ -81,7 +81,10 @@ impl ParsedContract {
     fn contract_name_from_file(&self) -> String {
         let file_stem = self.path.file_stem().unwrap().to_str().unwrap().to_string();
         if file_stem.ends_with(".t") {
-            file_stem[0..file_stem.len() - 2].to_string() // Slice off the ".t" at the end.
+            // Get everything before the first dot, slicing off `.t`. This enables support for both
+            // (1) putting all tests in MyContract.t.sol, and (2) splitting up tests across multiple
+            // files such as `MyContract.SomeFunction.t.sol`.
+            file_stem.split('.').next().unwrap().to_string()
         } else {
             file_stem
         }
