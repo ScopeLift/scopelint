@@ -8,7 +8,7 @@ use std::path::Path;
 
 // A regex matching valid test names, see the `validate_test_names_regex` test for examples.
 static RE_VALID_TEST_NAME: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^test(Fork)?(Fuzz)?(_Revert(If|When|On))?_(\w+)*$").unwrap());
+    Lazy::new(|| Regex::new(r"^test(Fork)?(Fuzz)?(_Revert(If|When|On|Given))?_(\w+)*$").unwrap());
 
 fn is_matching_file(file: &Path) -> bool {
     file.is_file_kind(FileKind::Test)
@@ -118,6 +118,7 @@ mod tests {
             "testFuzz_RevertWhen_Condition",
             "testFuzz_RevertOn_Condition",
             "testFuzz_RevertOn_Condition_MoreInfo",
+            "testFuzz_RevertGiven_Condition",
             "testForkFuzz_RevertIf_Condition",
             "testForkFuzz_RevertWhen_Condition",
             "testForkFuzz_RevertOn_Condition",
