@@ -51,7 +51,9 @@ fn is_valid_test_name(name: &str) -> bool {
     }
 
     // Verify the revert naming convention. This is a workaround for the regex create not supporting
-    // look-ahead/behind.
+    // look-ahead/behind. We could use the `fancy_regex` crate, but the regex does get complicated
+    // and may be hard to understand and maintain, which is why we use this simpler regex + segment
+    // parsing approach.
     let segments: Vec<&str> = name.split('_').collect();
     for segment in segments {
         // If the segment contains `Revert` but does not start with `Revert` it is invalid.
