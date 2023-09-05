@@ -8,7 +8,7 @@ use std::path::Path;
 
 // A regex matching valid test names, see the `validate_test_names_regex` test for examples.
 static RE_VALID_TEST_NAME: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^test(Fork)?(Fuzz)?(_Revert(If|When|On))?_(\w+)*$").unwrap());
+    Lazy::new(|| Regex::new(r"^test(Fork)?(Fuzz)?(_Revert(If|When|On|Given))?_(\w+)*$").unwrap());
 
 fn is_matching_file(file: &Path) -> bool {
     file.is_file_kind(FileKind::Test)
@@ -45,7 +45,33 @@ pub fn validate(file: &Path, content: &str, pt: &SourceUnit) -> Vec<InvalidItem>
 }
 
 fn is_valid_test_name(name: &str) -> bool {
-    name.starts_with("test") && RE_VALID_TEST_NAME.is_match(name)
+    // Check that name matches the allowed pattern.
+    if !name.starts_with("test") || !RE_VALID_TEST_NAME.is_match(name) {
+        return false
+    }
+
+    // Verify the revert naming convention. This is a workaround for the regex create not supporting
+    // look-ahead/behind. We could use the `fancy_regex` crate, but the regex does get complicated
+    // and may be hard to understand and maintain, which is why we use this simpler regex + segment
+    // parsing approach.
+    let segments: Vec<&str> = name.split('_').collect();
+    for segment in segments {
+        // If the segment contains `Revert` but does not start with `Revert` it is invalid.
+        if segment.contains("Revert") && !segment.starts_with("Revert") {
+            return false
+        }
+
+        // If the segment starts with `Revert` it is valid if the rest of the segment is exactly
+        // `If`, `When`, `On`, or `Given`.
+        if segment.starts_with("Revert") {
+            match segment.strip_prefix("Revert") {
+                Some("If" | "When" | "On" | "Given") => {}
+                _ => return false,
+            }
+        }
+    }
+
+    true
 }
 
 fn is_test_function(f: &FunctionDefinition) -> bool {
@@ -118,9 +144,11 @@ mod tests {
             "testFuzz_RevertWhen_Condition",
             "testFuzz_RevertOn_Condition",
             "testFuzz_RevertOn_Condition_MoreInfo",
+            "testFuzz_RevertGiven_Condition",
             "testForkFuzz_RevertIf_Condition",
             "testForkFuzz_RevertWhen_Condition",
             "testForkFuzz_RevertOn_Condition",
+            "testForkFuzz_RevertGiven_Condition",
             "testForkFuzz_RevertOn_Condition_MoreInfo",
             "testForkFuzz_RevertOn_Condition_MoreInfo_Wow",
             "testForkFuzz_RevertOn_Condition_MoreInfo_Wow_As_Many_Underscores_As_You_Want",
@@ -128,18 +156,23 @@ mod tests {
 
         let disallowed_names = [
             "test",
+            "test123_Description",
             "testDescription",
             "testDescriptionMoreInfo",
-            // TODO The below are tough to prevent without regex look-ahead support.
-            // "test_RevertIfCondition",
-            // "test_RevertWhenCondition",
-            // "test_RevertOnCondition",
-            // "testFuzz_RevertIfDescription",
-            // "testFuzz_RevertWhenDescription",
-            // "testFuzz_RevertOnDescription",
-            // "testForkFuzz_RevertIfCondition",
-            // "testForkFuzz_RevertWhenCondition",
-            // "testForkFuzz_RevertOnCondition",
+            "testRevertIfCondition",
+            "testRevertIf_Condition",
+            "test_RevertIfCondition",
+            "test_RevertWhenCondition",
+            "test_RevertOnCondition",
+            "test_RevertGivenCondition",
+            "testFuzz_RevertIfDescription",
+            "testFuzz_RevertWhenDescription",
+            "testFuzz_RevertGivenDescription",
+            "testFuzz_RevertOnDescription",
+            "testForkFuzz_RevertIfCondition",
+            "testForkFuzz_RevertWhenCondition",
+            "testForkFuzz_RevertOnCondition",
+            "testForkFuzz_RevertGivenCondition",
         ];
 
         for name in allowed_names {
