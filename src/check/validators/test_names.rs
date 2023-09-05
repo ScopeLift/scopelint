@@ -146,6 +146,7 @@ mod tests {
             "testForkFuzz_RevertIf_Condition",
             "testForkFuzz_RevertWhen_Condition",
             "testForkFuzz_RevertOn_Condition",
+            "testForkFuzz_RevertGiven_Condition",
             "testForkFuzz_RevertOn_Condition_MoreInfo",
             "testForkFuzz_RevertOn_Condition_MoreInfo_Wow",
             "testForkFuzz_RevertOn_Condition_MoreInfo_Wow_As_Many_Underscores_As_You_Want",
@@ -161,6 +162,7 @@ mod tests {
             "test_RevertIfCondition",
             "test_RevertWhenCondition",
             "test_RevertOnCondition",
+            "test_RevertGivenCondition",
             "testFuzz_RevertIfDescription",
             "testFuzz_RevertWhenDescription",
             "testFuzz_RevertGivenDescription",
@@ -168,6 +170,7 @@ mod tests {
             "testForkFuzz_RevertIfCondition",
             "testForkFuzz_RevertWhenCondition",
             "testForkFuzz_RevertOnCondition",
+            "testForkFuzz_RevertGivenCondition",
         ];
 
         for name in allowed_names {
