@@ -23,6 +23,8 @@ pub enum ValidatorKind {
     Src,
     /// A test contract.
     Test,
+    /// A `// scopelint: <directive>` comment.
+    Directive,
 }
 
 /// A single invalid item found by a validator.
@@ -63,6 +65,9 @@ impl InvalidItem {
                     "Invalid src method name in {} on line {}: {}",
                     self.file, self.line, self.text
                 )
+            }
+            ValidatorKind::Directive => {
+                format!("Invalid directive in {}: {}", self.file, self.text)
             }
         }
     }
