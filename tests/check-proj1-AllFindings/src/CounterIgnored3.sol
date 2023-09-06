@@ -1,19 +1,21 @@
 // This file is identical to `Counter.sol` except it has ignore statements.
 
-// scopelint: disable-start
 pragma solidity ^0.8.17;
 
 contract CounterIgnored1 {
   uint256 public immutable _GOOD__IMMUTABLE_;
-  uint256 public immutable badImmutable;
+  uint256 public immutable badImmutable; // scopelint: disable-line
+  // scopelint: disable-next-line
   uint256 public constant bad_constant = 1;
 
   uint256 public number;
 
+  // scopelint: disable-start
   constructor() {
     _GOOD__IMMUTABLE_ = 2000;
     badImmutable = 5;
   }
+  // scopelint: disable-end
 
   function setNumber(uint256 newNumber) public {
     number = newNumber;
@@ -23,9 +25,10 @@ contract CounterIgnored1 {
     number++;
   }
 
+  // scopelint: disable-next-line
   function internalShouldHaveLeadingUnderscore() internal {}
   function _internalHasLeadingUnderscore() internal {}
-  function privateShouldHaveLeadingUnderscore() private {}
+  function privateShouldHaveLeadingUnderscore() private {} // scopelint: disable-line
 
   function _privateHasLeadingUnderscore() private {
     number += 1000;

@@ -31,3 +31,4 @@ contract CounterIgnored1 {
     number += 1000;
   }
 }
+// scopelint: disable-end
