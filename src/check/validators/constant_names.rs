@@ -25,6 +25,9 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
     for element in &pt.0 {
+        if is_in_disabled_region(parsed, element) {
+            continue
+        }
         match element {
             SourceUnitPart::VariableDefinition(v) => {
                 if let Some(invalid_item) = validate_name(file, src, v) {
