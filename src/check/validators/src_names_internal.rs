@@ -1,7 +1,11 @@
-use crate::check::utils::{
-    offset_to_line, FileKind, InvalidItem, IsFileKind, Name, ValidatorKind, VisibilitySummary,
+use crate::check::{
+    utils::{
+        is_in_disabled_region, offset_to_line, FileKind, InvalidItem, IsFileKind, Name,
+        ValidatorKind, VisibilitySummary,
+    },
+    Parsed,
 };
-use solang_parser::pt::{ContractPart, ContractTy, FunctionDefinition, SourceUnit, SourceUnitPart};
+use solang_parser::pt::{ContractPart, ContractTy, FunctionDefinition, SourceUnitPart};
 use std::path::Path;
 
 fn is_matching_file(file: &Path) -> bool {
@@ -10,16 +14,20 @@ fn is_matching_file(file: &Path) -> bool {
 
 #[must_use]
 /// Validates that internal and private function names are prefixed with an underscore.
-pub fn validate(file: &Path, content: &str, pt: &SourceUnit) -> Vec<InvalidItem> {
+pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
+    let Parsed { file, src, pt, .. } = parsed;
     if !is_matching_file(file) {
         return Vec::new()
     }
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
     for element in &pt.0 {
+        if is_in_disabled_region(parsed, element) {
+            continue
+        }
         match element {
             SourceUnitPart::FunctionDefinition(f) => {
-                if let Some(invalid_item) = validate_name(file, content, f) {
+                if let Some(invalid_item) = validate_name(file, src, f) {
                     invalid_items.push(invalid_item);
                 }
             }
@@ -28,7 +36,7 @@ pub fn validate(file: &Path, content: &str, pt: &SourceUnit) -> Vec<InvalidItem>
                 _ => {
                     for el in &c.parts {
                         if let ContractPart::FunctionDefinition(f) = el {
-                            if let Some(invalid_item) = validate_name(file, content, f) {
+                            if let Some(invalid_item) = validate_name(file, src, f) {
                                 invalid_items.push(invalid_item);
                             }
                         }

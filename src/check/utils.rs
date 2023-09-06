@@ -3,8 +3,10 @@
 // extensions manually with `ends_with`.
 #![allow(clippy::case_sensitive_file_extension_comparisons)]
 
+use super::Parsed;
 use solang_parser::pt::{
-    FunctionAttribute, FunctionDefinition, FunctionTy, SourceUnit, Visibility,
+    FunctionAttribute, FunctionDefinition, FunctionTy, Import, SourceUnit, SourceUnitPart,
+    Visibility,
 };
 use std::path::Path;
 
@@ -166,9 +168,70 @@ pub fn offset_to_line(content: &str, start: usize) -> usize {
     unreachable!("content.len() > start")
 }
 
+#[must_use]
+/// Returns true if the given element is within a disabled region.
+pub fn is_in_disabled_region(parsed: &Parsed, element: &SourceUnitPart) -> bool {
+    let Parsed { inline_config, .. } = parsed;
+    match element {
+        SourceUnitPart::PragmaDirective(loc, _, _) |
+        SourceUnitPart::ImportDirective(
+            Import::Plain(_, loc) | Import::GlobalSymbol(_, _, loc) | Import::Rename(_, _, loc),
+        ) |
+        SourceUnitPart::StraySemicolon(loc) => inline_config.is_disabled(*loc),
+        SourceUnitPart::ContractDefinition(c) => {
+            let solang_parser::pt::ContractDefinition { loc, .. } = **c;
+            inline_config.is_disabled(loc)
+        }
+        SourceUnitPart::EnumDefinition(e) => {
+            let solang_parser::pt::EnumDefinition { loc, .. } = **e;
+            inline_config.is_disabled(loc)
+        }
+        SourceUnitPart::StructDefinition(s) => {
+            let solang_parser::pt::StructDefinition { loc, .. } = **s;
+            inline_config.is_disabled(loc)
+        }
+        SourceUnitPart::EventDefinition(e) => {
+            let solang_parser::pt::EventDefinition { loc, .. } = **e;
+            inline_config.is_disabled(loc)
+        }
+        SourceUnitPart::ErrorDefinition(e) => {
+            let solang_parser::pt::ErrorDefinition { loc, .. } = **e;
+            inline_config.is_disabled(loc)
+        }
+        SourceUnitPart::FunctionDefinition(f) => {
+            let solang_parser::pt::FunctionDefinition { loc, .. } = **f;
+            inline_config.is_disabled(loc)
+        }
+        SourceUnitPart::VariableDefinition(v) => {
+            let solang_parser::pt::VariableDefinition { loc, .. } = **v;
+            inline_config.is_disabled(loc)
+        }
+        SourceUnitPart::TypeDefinition(t) => {
+            let solang_parser::pt::TypeDefinition { loc, .. } = **t;
+            inline_config.is_disabled(loc)
+        }
+        SourceUnitPart::Annotation(a) => {
+            let solang_parser::pt::Annotation { loc, .. } = **a;
+            inline_config.is_disabled(loc)
+        }
+        SourceUnitPart::Using(u) => {
+            let solang_parser::pt::Using { loc, .. } = **u;
+            inline_config.is_disabled(loc)
+        }
+    }
+}
+
 // ===========================
 // ======== For tests ========
 // ===========================
+
+// TODO Defining this section of code for tests feels hacky, come up with a better approach here.
+use crate::check::{
+    comments::Comments,
+    inline_config::{InlineConfig, InvalidInlineConfigItem},
+};
+use itertools::Itertools;
+use std::path::PathBuf;
 
 #[derive(Default)]
 /// Given the number of expected findings for each file kind, this struct makes it easy to assert
@@ -186,7 +249,7 @@ pub struct ExpectedFindings {
     pub test: usize,
 }
 
-type ValidatorFn = dyn Fn(&Path, &str, &SourceUnit) -> Vec<InvalidItem>;
+type ValidatorFn = dyn Fn(&Parsed) -> Vec<InvalidItem>;
 
 impl ExpectedFindings {
     #[must_use]
@@ -208,16 +271,92 @@ impl ExpectedFindings {
     /// number for the given content, for each file kind.
     /// # Panics
     /// In practice this should not panic unless one of validations fails.
-    pub fn assert_eq(&self, content: &str, validate: &ValidatorFn) {
-        let (pt, _comments) = solang_parser::parse(content, 0).expect("Parsing failed");
+    pub fn assert_eq(&self, src: &str, validate: &ValidatorFn) {
+        /// Generates a `Parsed` struct from the given data.
+        fn to_parsed(
+            path_name: &str,
+            src: &str,
+            pt: SourceUnit,
+            comments: Comments,
+            inline_config: InlineConfig,
+            invalid_inline_config_items: Vec<(solang_parser::pt::Loc, InvalidInlineConfigItem)>,
+        ) -> Parsed {
+            Parsed {
+                file: PathBuf::from(path_name),
+                src: src.to_string(),
+                pt,
+                comments,
+                inline_config,
+                invalid_inline_config_items,
+            }
+        }
+        // Parse content.
+        let (pt, comments) = solang_parser::parse(src, 0).expect("Parsing failed");
+        let comments = Comments::new(comments, src);
 
-        let invalid_items_script_helper =
-            validate(Path::new("./script/MyContract.sol"), content, &pt);
-        let invalid_items_script = validate(Path::new("./script/MyContract.s.sol"), content, &pt);
-        let invalid_items_src = validate(Path::new("./src/MyContract.sol"), content, &pt);
-        let invalid_items_test_helper = validate(Path::new("./test/MyContract.sol"), content, &pt);
-        let invalid_items_test = validate(Path::new("./test/MyContract.t.sol"), content, &pt);
+        // Create `Parsed` struct for each file path to test. We can clone `pt` and `comments`, but
+        // recreate `inline_config` and `invalid_inline_config_items` because they cannot be cloned.
+        let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
+            comments.parse_inline_config_items().partition_result();
+        let inline_config = InlineConfig::new(inline_config_items, src);
+        let invalid_items_script_helper = validate(&to_parsed(
+            "./script/MyContract.sol",
+            src,
+            pt.clone(),
+            comments.clone(),
+            inline_config,
+            invalid_inline_config_items,
+        ));
 
+        let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
+            comments.parse_inline_config_items().partition_result();
+        let inline_config = InlineConfig::new(inline_config_items, src);
+        let invalid_items_script = validate(&to_parsed(
+            "./script/MyContract.s.sol",
+            src,
+            pt.clone(),
+            comments.clone(),
+            inline_config,
+            invalid_inline_config_items,
+        ));
+
+        let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
+            comments.parse_inline_config_items().partition_result();
+        let inline_config = InlineConfig::new(inline_config_items, src);
+        let invalid_items_src = validate(&to_parsed(
+            "./src/MyContract.sol",
+            src,
+            pt.clone(),
+            comments.clone(),
+            inline_config,
+            invalid_inline_config_items,
+        ));
+
+        let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
+            comments.parse_inline_config_items().partition_result();
+        let inline_config = InlineConfig::new(inline_config_items, src);
+        let invalid_items_test_helper = validate(&to_parsed(
+            "./test/MyContract.sol",
+            src,
+            pt.clone(),
+            comments.clone(),
+            inline_config,
+            invalid_inline_config_items,
+        ));
+
+        let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
+            comments.parse_inline_config_items().partition_result();
+        let inline_config = InlineConfig::new(inline_config_items, src);
+        let invalid_items_test = validate(&to_parsed(
+            "./test/MyContract.t.sol",
+            src,
+            pt,
+            comments,
+            inline_config,
+            invalid_inline_config_items,
+        ));
+
+        //  Execute tests.
         assert_eq!(invalid_items_script_helper.len(), self.script_helper);
         assert_eq!(invalid_items_script.len(), self.script);
         assert_eq!(invalid_items_src.len(), self.src);

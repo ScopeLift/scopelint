@@ -1,9 +1,13 @@
-use crate::check::utils::{
-    offset_to_line, FileKind, InvalidItem, IsFileKind, Name, ValidatorKind, VisibilitySummary,
+use crate::check::{
+    utils::{
+        is_in_disabled_region, offset_to_line, FileKind, InvalidItem, IsFileKind, Name,
+        ValidatorKind, VisibilitySummary,
+    },
+    Parsed,
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
-use solang_parser::pt::{ContractPart, FunctionDefinition, SourceUnit, SourceUnitPart};
+use solang_parser::pt::{ContractPart, FunctionDefinition, SourceUnitPart};
 use std::path::Path;
 
 // A regex matching valid test names, see the `validate_test_names_regex` test for examples.
@@ -16,23 +20,27 @@ fn is_matching_file(file: &Path) -> bool {
 
 #[must_use]
 /// Validates that test names are in the correct format.
-pub fn validate(file: &Path, content: &str, pt: &SourceUnit) -> Vec<InvalidItem> {
+pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
+    let Parsed { file, src, pt, .. } = parsed;
     if !is_matching_file(file) {
         return Vec::new()
     }
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
     for element in &pt.0 {
+        if is_in_disabled_region(parsed, element) {
+            continue
+        }
         match element {
             SourceUnitPart::FunctionDefinition(f) => {
-                if let Some(invalid_item) = validate_name(file, content, f) {
+                if let Some(invalid_item) = validate_name(file, src, f) {
                     invalid_items.push(invalid_item);
                 }
             }
             SourceUnitPart::ContractDefinition(c) => {
                 for el in &c.parts {
                     if let ContractPart::FunctionDefinition(f) = el {
-                        if let Some(invalid_item) = validate_name(file, content, f) {
+                        if let Some(invalid_item) = validate_name(file, src, f) {
                             invalid_items.push(invalid_item);
                         }
                     }

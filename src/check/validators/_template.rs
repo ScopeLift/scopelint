@@ -1,4 +1,7 @@
-use crate::check::utils::{offset_to_line, InvalidItem, Validator};
+use crate::check::{
+    utils::{offset_to_line, InvalidItem, Validator},
+    Parsed,
+};
 use solang_parser::pt::{
     ContractPart, SourceUnit, SourceUnitPart, VariableAttribute, VariableDefinition,
 };
@@ -10,14 +13,18 @@ const fn is_matching_file(_file: &Path) -> bool {
 
 #[must_use]
 /// Validates that <explain validator>.
-pub fn validate(file: &Path, content: &str, pt: &SourceUnit) -> Vec<InvalidItem> {
+pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
+    let Parsed { file, src, pt, .. } = parsed;
     if !is_matching_file(file) {
         return Vec::new()
     }
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
-    // Only edit below here to add your own validation logic.
+    // Edit below here to add your own validation logic.
     for element in &pt.0 {
+        if is_in_disabled_region(parsed, element) {
+            continue
+        }
         match element {
             _ => (),
         }

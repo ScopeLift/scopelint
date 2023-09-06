@@ -1,7 +1,11 @@
-use crate::check::utils::{
-    FileKind, InvalidItem, IsFileKind, Name, ValidatorKind, VisibilitySummary,
+use crate::check::{
+    utils::{
+        is_in_disabled_region, FileKind, InvalidItem, IsFileKind, Name, ValidatorKind,
+        VisibilitySummary,
+    },
+    Parsed,
 };
-use solang_parser::pt::{ContractPart, SourceUnit, SourceUnitPart};
+use solang_parser::pt::{ContractPart, SourceUnitPart};
 use std::path::Path;
 
 fn is_matching_file(file: &Path) -> bool {
@@ -10,13 +14,17 @@ fn is_matching_file(file: &Path) -> bool {
 
 #[must_use]
 /// Validates that a script has a single public method named `run`.
-pub fn validate(file: &Path, _content: &str, pt: &SourceUnit) -> Vec<InvalidItem> {
+pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
+    let Parsed { file, pt, .. } = parsed;
     if !is_matching_file(file) {
         return Vec::new()
     }
 
     let mut public_methods: Vec<String> = Vec::new();
     for element in &pt.0 {
+        if is_in_disabled_region(parsed, element) {
+            continue
+        }
         if let SourceUnitPart::ContractDefinition(c) = element {
             for el in &c.parts {
                 if let ContractPart::FunctionDefinition(f) = el {

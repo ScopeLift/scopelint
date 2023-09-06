@@ -1,8 +1,17 @@
-use crate::check::{comments::Comments, inline_config::InlineConfig};
+use crate::check::{
+    comments::Comments,
+    inline_config::{InlineConfig, InvalidInlineConfigItem},
+    utils::offset_to_line,
+};
 use colored::Colorize;
 use itertools::Itertools;
-use solang_parser::helpers::OptionalCodeLocation;
-use std::{error::Error, ffi::OsStr, fs};
+use solang_parser::pt::{Loc, SourceUnit};
+use std::{
+    error::Error,
+    ffi::OsStr,
+    fs,
+    path::{Path, PathBuf},
+};
 use walkdir::WalkDir;
 
 /// Contains all the types and methods to parse comments.
@@ -53,6 +62,51 @@ fn validate_conventions() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Result of parsing the source code. This is the same struct used in the forge's fmt module.
+#[derive(Debug)]
+pub struct Parsed {
+    /// Path to the file.
+    pub file: PathBuf,
+    /// The original source code.
+    pub src: String,
+    /// The Parse Tree via [`solang`].
+    pub pt: SourceUnit,
+    /// Parsed comments.
+    pub comments: Comments,
+    /// Parsed inline config.
+    pub inline_config: InlineConfig,
+    /// Invalid inline config items parsed.
+    pub invalid_inline_config_items: Vec<(Loc, InvalidInlineConfigItem)>,
+}
+
+/// Parses the source code and returns a [`Parsed`] struct.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read or its source code cannot be parsed.
+pub fn parse(file: &Path) -> Result<Parsed, Box<dyn Error>> {
+    let src = &fs::read_to_string(file)?;
+
+    let (pt, comments) = solang_parser::parse(src, 0).map_err(|d| {
+        eprintln!("{:?}", d);
+        "Failed to parse file".to_string()
+    })?;
+
+    let comments = Comments::new(comments, src);
+    let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
+        comments.parse_inline_config_items().partition_result();
+    let inline_config = InlineConfig::new(inline_config_items, src);
+
+    Ok(Parsed {
+        file: file.to_owned(),
+        src: src.clone(),
+        pt,
+        comments,
+        inline_config,
+        invalid_inline_config_items,
+    })
+}
+
 // Core validation method that walks the directory and validates all Solidity files.
 fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
     let mut results = report::Report::default();
@@ -72,38 +126,23 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
             }
 
             // Get the parse tree (pt) of the file and extract inline configs.
-            let file = dent.path();
-            let src = &fs::read_to_string(file)?;
-            let (pt, comments) = solang_parser::parse(src, 0).expect("Parsing failed");
-            let comments = Comments::new(comments, src);
-            let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
-                comments.parse_inline_config_items().partition_result();
-            let inline_config = InlineConfig::new(inline_config_items, src);
+            let parsed = parse(dent.path())?;
 
             // If there are any invalid inline config items, add them to the results.
-            for invalid_item in invalid_inline_config_items {
+            for invalid_item in &parsed.invalid_inline_config_items {
                 results.add_item(utils::InvalidItem::new(
                     utils::ValidatorKind::Directive,
-                    file.display().to_string(),
+                    parsed.file.display().to_string(),
                     invalid_item.1.to_string(),
-                    utils::offset_to_line(src, invalid_item.0.start()),
+                    offset_to_line(&parsed.src, invalid_item.0.start()),
                 ));
             }
 
-            // Skip if we're in a disabled region.
-            let source_units = &pt.0;
-            let is_in_disabled_region = source_units.iter().any(|source_unit| {
-                source_unit.loc_opt().map_or(false, |loc| inline_config.is_disabled(loc))
-            });
-            if is_in_disabled_region {
-                continue
-            }
-
             // Run all checks.
-            results.add_items(validators::test_names::validate(file, src, &pt));
-            results.add_items(validators::src_names_internal::validate(file, src, &pt));
-            results.add_items(validators::script_one_pubic_run_method::validate(file, src, &pt));
-            results.add_items(validators::constant_names::validate(file, src, &pt));
+            results.add_items(validators::test_names::validate(&parsed));
+            results.add_items(validators::src_names_internal::validate(&parsed));
+            results.add_items(validators::script_one_pubic_run_method::validate(&parsed));
+            results.add_items(validators::constant_names::validate(&parsed));
         }
     }
     Ok(results)

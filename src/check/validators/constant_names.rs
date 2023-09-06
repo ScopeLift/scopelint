@@ -1,9 +1,10 @@
-use crate::check::utils::{offset_to_line, InvalidItem, ValidatorKind};
+use crate::check::{
+    utils::{is_in_disabled_region, offset_to_line, InvalidItem, ValidatorKind},
+    Parsed,
+};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use solang_parser::pt::{
-    ContractPart, SourceUnit, SourceUnitPart, VariableAttribute, VariableDefinition,
-};
+use solang_parser::pt::{ContractPart, SourceUnitPart, VariableAttribute, VariableDefinition};
 use std::path::Path;
 
 // A regex matching valid constant names, see the `validate_constant_names_regex` test for examples.
@@ -16,23 +17,27 @@ const fn is_matching_file(_file: &Path) -> bool {
 
 #[must_use]
 /// Validates that constant and immutable variable names are in `ALL_CAPS`.
-pub fn validate(file: &Path, content: &str, pt: &SourceUnit) -> Vec<InvalidItem> {
+pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
+    let Parsed { file, src, pt, .. } = parsed;
     if !is_matching_file(file) {
         return Vec::new()
     }
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
     for element in &pt.0 {
+        if is_in_disabled_region(parsed, element) {
+            continue
+        }
         match element {
             SourceUnitPart::VariableDefinition(v) => {
-                if let Some(invalid_item) = validate_name(file, content, v) {
+                if let Some(invalid_item) = validate_name(file, src, v) {
                     invalid_items.push(invalid_item);
                 }
             }
             SourceUnitPart::ContractDefinition(c) => {
                 for el in &c.parts {
                     if let ContractPart::VariableDefinition(v) = el {
-                        if let Some(invalid_item) = validate_name(file, content, v) {
+                        if let Some(invalid_item) = validate_name(file, src, v) {
                             invalid_items.push(invalid_item);
                         }
                     }
