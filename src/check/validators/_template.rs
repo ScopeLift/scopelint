@@ -22,9 +22,6 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
     // Edit below here to add your own validation logic.
     for element in &pt.0 {
-        if is_in_disabled_region(parsed, element) {
-            continue
-        }
         match element {
             _ => (),
         }

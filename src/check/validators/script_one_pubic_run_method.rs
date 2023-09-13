@@ -22,12 +22,12 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
 
     let mut public_methods: Vec<String> = Vec::new();
     for element in &pt.0 {
-        if is_in_disabled_region(parsed, element) {
-            continue
-        }
         if let SourceUnitPart::ContractDefinition(c) = element {
             for el in &c.parts {
                 if let ContractPart::FunctionDefinition(f) = el {
+                    if is_in_disabled_region(parsed, f.loc) {
+                        continue
+                    }
                     let name = f.name();
                     if f.is_public_or_external() && name != "setUp" && name != "constructor" {
                         public_methods.push(name);

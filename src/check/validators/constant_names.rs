@@ -25,18 +25,21 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
     for element in &pt.0 {
-        if is_in_disabled_region(parsed, element) {
-            continue
-        }
         match element {
             SourceUnitPart::VariableDefinition(v) => {
                 if let Some(invalid_item) = validate_name(file, src, v) {
+                    if is_in_disabled_region(parsed, v.loc) {
+                        continue
+                    }
                     invalid_items.push(invalid_item);
                 }
             }
             SourceUnitPart::ContractDefinition(c) => {
                 for el in &c.parts {
                     if let ContractPart::VariableDefinition(v) = el {
+                        if is_in_disabled_region(parsed, v.loc) {
+                            continue
+                        }
                         if let Some(invalid_item) = validate_name(file, src, v) {
                             invalid_items.push(invalid_item);
                         }

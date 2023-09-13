@@ -5,8 +5,7 @@
 
 use super::Parsed;
 use solang_parser::pt::{
-    FunctionAttribute, FunctionDefinition, FunctionTy, Import, SourceUnit, SourceUnitPart,
-    Visibility,
+    FunctionAttribute, FunctionDefinition, FunctionTy, Loc, SourceUnit, Visibility,
 };
 use std::path::Path;
 
@@ -170,55 +169,8 @@ pub fn offset_to_line(content: &str, start: usize) -> usize {
 
 #[must_use]
 /// Returns true if the given element is within a disabled region.
-pub fn is_in_disabled_region(parsed: &Parsed, element: &SourceUnitPart) -> bool {
-    let Parsed { inline_config, .. } = parsed;
-    match element {
-        SourceUnitPart::PragmaDirective(loc, _, _) |
-        SourceUnitPart::ImportDirective(
-            Import::Plain(_, loc) | Import::GlobalSymbol(_, _, loc) | Import::Rename(_, _, loc),
-        ) |
-        SourceUnitPart::StraySemicolon(loc) => inline_config.is_disabled(*loc),
-        SourceUnitPart::ContractDefinition(c) => {
-            let solang_parser::pt::ContractDefinition { loc, .. } = **c;
-            inline_config.is_disabled(loc)
-        }
-        SourceUnitPart::EnumDefinition(e) => {
-            let solang_parser::pt::EnumDefinition { loc, .. } = **e;
-            inline_config.is_disabled(loc)
-        }
-        SourceUnitPart::StructDefinition(s) => {
-            let solang_parser::pt::StructDefinition { loc, .. } = **s;
-            inline_config.is_disabled(loc)
-        }
-        SourceUnitPart::EventDefinition(e) => {
-            let solang_parser::pt::EventDefinition { loc, .. } = **e;
-            inline_config.is_disabled(loc)
-        }
-        SourceUnitPart::ErrorDefinition(e) => {
-            let solang_parser::pt::ErrorDefinition { loc, .. } = **e;
-            inline_config.is_disabled(loc)
-        }
-        SourceUnitPart::FunctionDefinition(f) => {
-            let solang_parser::pt::FunctionDefinition { loc, .. } = **f;
-            inline_config.is_disabled(loc)
-        }
-        SourceUnitPart::VariableDefinition(v) => {
-            let solang_parser::pt::VariableDefinition { loc, .. } = **v;
-            inline_config.is_disabled(loc)
-        }
-        SourceUnitPart::TypeDefinition(t) => {
-            let solang_parser::pt::TypeDefinition { loc, .. } = **t;
-            inline_config.is_disabled(loc)
-        }
-        SourceUnitPart::Annotation(a) => {
-            let solang_parser::pt::Annotation { loc, .. } = **a;
-            inline_config.is_disabled(loc)
-        }
-        SourceUnitPart::Using(u) => {
-            let solang_parser::pt::Using { loc, .. } = **u;
-            inline_config.is_disabled(loc)
-        }
-    }
+pub fn is_in_disabled_region(parsed: &Parsed, loc: Loc) -> bool {
+    parsed.inline_config.is_disabled(loc)
 }
 
 // ===========================
