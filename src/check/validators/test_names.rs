@@ -82,7 +82,7 @@ fn is_test_function(f: &FunctionDefinition) -> bool {
 fn validate_name(parsed: &Parsed, f: &FunctionDefinition) -> Option<InvalidItem> {
     let name = f.name();
     if is_test_function(f) && !is_valid_test_name(&name) {
-        Some(InvalidItem::new(ValidatorKind::Test, parsed, f.loc, name))
+        Some(InvalidItem::new(ValidatorKind::Test, parsed, f.name_loc, name))
     } else {
         None
     }

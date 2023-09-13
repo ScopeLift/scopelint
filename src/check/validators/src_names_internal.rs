@@ -49,7 +49,7 @@ fn is_valid_internal_or_private_name(name: &str) -> bool {
 fn validate_name(parsed: &Parsed, f: &FunctionDefinition) -> Option<InvalidItem> {
     let name = f.name();
     if f.is_internal_or_private() && !is_valid_internal_or_private_name(&name) {
-        Some(InvalidItem::new(ValidatorKind::Src, parsed, f.loc, name))
+        Some(InvalidItem::new(ValidatorKind::Src, parsed, f.name_loc, name))
     } else {
         None
     }

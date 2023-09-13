@@ -1,4 +1,5 @@
-// This file is identical to `Counter.sol` except it has ignore statements.
+// This file is identical to `Counter.sol` except it has ignore statements and adds multiline
+// function declaration tests.
 
 pragma solidity ^0.8.17;
 
@@ -31,5 +32,23 @@ contract CounterIgnored1 {
 
   function _privateHasLeadingUnderscore() private {
     number += 1000;
+  }
+
+  // -------- Multiline function declaration tests --------
+  function prettyLongMethodName( // scopelint: disable-line
+    address someImportantUser,
+    uint256 someImportantNumber,
+    bytes32 someImportantData
+  ) internal {
+    // do something
+  }
+
+  // scopelint: disable-next-line
+  function prettyLongMethodName2(
+    address someImportantUser,
+    uint256 someImportantNumber,
+    bytes32 someImportantData
+  ) internal {
+    // do something
   }
 }

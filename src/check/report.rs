@@ -33,6 +33,6 @@ impl Report {
     /// Returns true if no issues were found.
     #[must_use]
     pub fn is_valid(&self) -> bool {
-        self.invalid_items.is_empty()
+        !self.invalid_items.iter().any(|item| !item.is_disabled)
     }
 }

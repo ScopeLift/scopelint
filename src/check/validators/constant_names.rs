@@ -54,13 +54,19 @@ fn validate_name(parsed: &Parsed, v: &VariableDefinition) -> Option<InvalidItem>
         .attrs
         .iter()
         .any(|a| matches!(a, VariableAttribute::Constant(_) | VariableAttribute::Immutable(_)));
-    let name = &v.name.as_ref().unwrap().name;
 
-    if is_constant && !is_valid_constant_name(name) {
-        Some(InvalidItem::new(ValidatorKind::Constant, parsed, v.loc, name.clone()))
-    } else {
-        None
+    if !is_constant {
+        return None
     }
+
+    v.name.as_ref().and_then(|name| {
+        let name_string = &name.name;
+        if is_valid_constant_name(name_string) {
+            None
+        } else {
+            Some(InvalidItem::new(ValidatorKind::Constant, parsed, name.loc, name_string.clone()))
+        }
+    })
 }
 
 #[cfg(test)]
