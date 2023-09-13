@@ -764,6 +764,7 @@ version = "0.0.19"
 dependencies = [
  "clap",
  "colored",
+ "itertools 0.11.0",
  "once_cell",
  "regex",
  "solang-parser",

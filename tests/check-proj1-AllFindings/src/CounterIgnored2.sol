@@ -1,6 +1,9 @@
+// This file is identical to `Counter.sol` except it has ignore statements.
+
+// scopelint: disable-start
 pragma solidity ^0.8.17;
 
-contract Counter {
+contract CounterIgnored1 {
   uint256 public immutable _GOOD__IMMUTABLE_;
   uint256 public immutable badImmutable;
   uint256 public constant bad_constant = 1;
@@ -28,7 +31,4 @@ contract Counter {
     number += 1000;
   }
 }
-
-// scopelint: this directive is invalid
-// Extra line break at the bottom is intention to ensure formatting fails.
-
+// scopelint: disable-end

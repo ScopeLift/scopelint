@@ -1,9 +1,10 @@
-use crate::check::utils::{offset_to_line, InvalidItem, ValidatorKind};
+use crate::check::{
+    utils::{InvalidItem, ValidatorKind},
+    Parsed,
+};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use solang_parser::pt::{
-    ContractPart, SourceUnit, SourceUnitPart, VariableAttribute, VariableDefinition,
-};
+use solang_parser::pt::{ContractPart, SourceUnitPart, VariableAttribute, VariableDefinition};
 use std::path::Path;
 
 // A regex matching valid constant names, see the `validate_constant_names_regex` test for examples.
@@ -16,23 +17,23 @@ const fn is_matching_file(_file: &Path) -> bool {
 
 #[must_use]
 /// Validates that constant and immutable variable names are in `ALL_CAPS`.
-pub fn validate(file: &Path, content: &str, pt: &SourceUnit) -> Vec<InvalidItem> {
-    if !is_matching_file(file) {
+pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
+    if !is_matching_file(&parsed.file) {
         return Vec::new()
     }
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
-    for element in &pt.0 {
+    for element in &parsed.pt.0 {
         match element {
             SourceUnitPart::VariableDefinition(v) => {
-                if let Some(invalid_item) = validate_name(file, content, v) {
+                if let Some(invalid_item) = validate_name(parsed, v) {
                     invalid_items.push(invalid_item);
                 }
             }
             SourceUnitPart::ContractDefinition(c) => {
                 for el in &c.parts {
                     if let ContractPart::VariableDefinition(v) = el {
-                        if let Some(invalid_item) = validate_name(file, content, v) {
+                        if let Some(invalid_item) = validate_name(parsed, v) {
                             invalid_items.push(invalid_item);
                         }
                     }
@@ -48,23 +49,24 @@ fn is_valid_constant_name(name: &str) -> bool {
     RE_VALID_CONSTANT_NAME.is_match(name)
 }
 
-fn validate_name(file: &Path, content: &str, v: &VariableDefinition) -> Option<InvalidItem> {
+fn validate_name(parsed: &Parsed, v: &VariableDefinition) -> Option<InvalidItem> {
     let is_constant = v
         .attrs
         .iter()
         .any(|a| matches!(a, VariableAttribute::Constant(_) | VariableAttribute::Immutable(_)));
-    let name = &v.name.as_ref().unwrap().name;
 
-    if is_constant && !is_valid_constant_name(name) {
-        Some(InvalidItem::new(
-            ValidatorKind::Constant,
-            file.display().to_string(),
-            name.clone(),
-            offset_to_line(content, v.loc.start()),
-        ))
-    } else {
-        None
+    if !is_constant {
+        return None
     }
+
+    v.name.as_ref().and_then(|name| {
+        let name_string = &name.name;
+        if is_valid_constant_name(name_string) {
+            None
+        } else {
+            Some(InvalidItem::new(ValidatorKind::Constant, parsed, name.loc, name_string.clone()))
+        }
+    })
 }
 
 #[cfg(test)]
