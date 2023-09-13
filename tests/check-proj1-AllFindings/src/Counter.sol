@@ -29,3 +29,5 @@ contract Counter {
   }
 }
 
+// scopelint: this directive is invalid
+
