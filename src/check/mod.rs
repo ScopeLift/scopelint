@@ -61,7 +61,7 @@ fn validate_conventions() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-/// Result of parsing the source code. This is the same struct used in the forge's fmt module.
+/// Result of parsing the source code. This is the same struct used in forge's fmt module.
 #[derive(Debug)]
 pub struct Parsed {
     /// Path to the file.
