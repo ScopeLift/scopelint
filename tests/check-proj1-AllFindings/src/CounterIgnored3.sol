@@ -10,12 +10,11 @@ contract CounterIgnored1 {
 
   uint256 public number;
 
-  // scopelint: disable-start
+  // scopelint: disable-next-item
   constructor() {
     _GOOD__IMMUTABLE_ = 2000;
     badImmutable = 5;
   }
-  // scopelint: disable-end
 
   function setNumber(uint256 newNumber) public {
     number = newNumber;
