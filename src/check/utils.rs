@@ -199,8 +199,6 @@ pub struct ExpectedFindings {
     pub test: usize,
 }
 
-type ValidatorFn = dyn Fn(&Parsed) -> Vec<InvalidItem>;
-
 impl ExpectedFindings {
     #[must_use]
     /// Creates a new `ExpectedFindings` with the given number of expected findings for each file
@@ -219,9 +217,11 @@ impl ExpectedFindings {
 
     /// Asserts that the number of invalid items found by the validator is equal to the expected
     /// number for the given content, for each file kind.
+    ///
     /// # Panics
+    ///
     /// In practice this should not panic unless one of validations fails.
-    pub fn assert_eq(&self, src: &str, validate: &ValidatorFn) {
+    pub fn assert_eq(&self, src: &str, validate: &dyn Fn(&Parsed) -> Vec<InvalidItem>) {
         /// Generates a `Parsed` struct from the given data.
         fn to_parsed(
             path_name: &str,
