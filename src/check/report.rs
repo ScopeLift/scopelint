@@ -1,4 +1,5 @@
 use super::utils::InvalidItem;
+use itertools::Itertools;
 use std::fmt;
 
 /// A collection of invalid items to generate a report from.
@@ -10,13 +11,11 @@ pub struct Report {
 
 impl fmt::Display for Report {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut sorted_items = self.invalid_items.clone();
-        sorted_items.sort();
-
-        for item in sorted_items {
-            writeln!(f, "{}", item.description())?;
-        }
-        Ok(())
+        self.invalid_items
+            .iter()
+            .filter(|item| !item.is_disabled)
+            .sorted_unstable()
+            .try_for_each(|item| writeln!(f, "{}", item.description()))
     }
 }
 

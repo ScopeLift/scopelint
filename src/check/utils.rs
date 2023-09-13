@@ -31,17 +31,21 @@ pub enum ValidatorKind {
 /// A single invalid item found by a validator.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct InvalidItem {
-    kind: ValidatorKind,
-    file: String, // File name.
-    text: String, // Details to show about the invalid item.
-    line: usize,  // Line number.
+    pub kind: ValidatorKind,
+    pub file: String,      // File name.
+    pub text: String,      // Details to show about the invalid item.
+    pub line: usize,       // Line number.
+    pub is_disabled: bool, // Whether the invalid item is in a disabled region.
 }
 
 impl InvalidItem {
     #[must_use]
     /// Creates a new `InvalidItem`.
-    pub const fn new(kind: ValidatorKind, file: String, text: String, line: usize) -> Self {
-        Self { kind, file, text, line }
+    pub fn new(kind: ValidatorKind, parsed: &Parsed, loc: Loc, text: String) -> Self {
+        let Parsed { file, src, inline_config, .. } = parsed;
+        let line = offset_to_line(src, loc.start());
+        let is_disabled = inline_config.is_disabled(loc);
+        Self { kind, file: file.display().to_string(), text, line, is_disabled }
     }
 
     #[must_use]
@@ -165,12 +169,6 @@ pub fn offset_to_line(content: &str, start: usize) -> usize {
     }
 
     unreachable!("content.len() > start")
-}
-
-#[must_use]
-/// Returns true if the given element is within a disabled region.
-pub fn is_in_disabled_region(parsed: &Parsed, loc: Loc) -> bool {
-    parsed.inline_config.is_disabled(loc)
 }
 
 // ===========================

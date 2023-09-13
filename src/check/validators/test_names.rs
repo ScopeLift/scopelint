@@ -1,8 +1,5 @@
 use crate::check::{
-    utils::{
-        is_in_disabled_region, offset_to_line, FileKind, InvalidItem, IsFileKind, Name,
-        ValidatorKind, VisibilitySummary,
-    },
+    utils::{FileKind, InvalidItem, IsFileKind, Name, ValidatorKind, VisibilitySummary},
     Parsed,
 };
 use once_cell::sync::Lazy;
@@ -21,29 +18,22 @@ fn is_matching_file(file: &Path) -> bool {
 #[must_use]
 /// Validates that test names are in the correct format.
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
-    let Parsed { file, src, pt, .. } = parsed;
-    if !is_matching_file(file) {
+    if !is_matching_file(&parsed.file) {
         return Vec::new()
     }
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
-    for element in &pt.0 {
+    for element in &parsed.pt.0 {
         match element {
             SourceUnitPart::FunctionDefinition(f) => {
-                if is_in_disabled_region(parsed, f.loc) {
-                    continue
-                }
-                if let Some(invalid_item) = validate_name(file, src, f) {
+                if let Some(invalid_item) = validate_name(parsed, f) {
                     invalid_items.push(invalid_item);
                 }
             }
             SourceUnitPart::ContractDefinition(c) => {
                 for el in &c.parts {
                     if let ContractPart::FunctionDefinition(f) = el {
-                        if is_in_disabled_region(parsed, f.loc) {
-                            continue
-                        }
-                        if let Some(invalid_item) = validate_name(file, src, f) {
+                        if let Some(invalid_item) = validate_name(parsed, f) {
                             invalid_items.push(invalid_item);
                         }
                     }
@@ -89,15 +79,10 @@ fn is_test_function(f: &FunctionDefinition) -> bool {
     f.is_public_or_external() && f.name().starts_with("test")
 }
 
-fn validate_name(file: &Path, content: &str, f: &FunctionDefinition) -> Option<InvalidItem> {
+fn validate_name(parsed: &Parsed, f: &FunctionDefinition) -> Option<InvalidItem> {
     let name = f.name();
     if is_test_function(f) && !is_valid_test_name(&name) {
-        Some(InvalidItem::new(
-            ValidatorKind::Test,
-            file.display().to_string(),
-            name,
-            offset_to_line(content, f.loc.start()),
-        ))
+        Some(InvalidItem::new(ValidatorKind::Test, parsed, f.loc, name))
     } else {
         None
     }

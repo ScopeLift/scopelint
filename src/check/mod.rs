@@ -1,7 +1,6 @@
 use crate::check::{
     comments::Comments,
     inline_config::{InlineConfig, InvalidInlineConfigItem},
-    utils::offset_to_line,
 };
 use colored::Colorize;
 use itertools::Itertools;
@@ -132,9 +131,9 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
             for invalid_item in &parsed.invalid_inline_config_items {
                 results.add_item(utils::InvalidItem::new(
                     utils::ValidatorKind::Directive,
-                    parsed.file.display().to_string(),
+                    &parsed,
+                    invalid_item.0,
                     invalid_item.1.to_string(),
-                    offset_to_line(&parsed.src, invalid_item.0.start()),
                 ));
             }
 

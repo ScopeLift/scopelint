@@ -1,11 +1,8 @@
 use crate::check::{
-    utils::{
-        is_in_disabled_region, FileKind, InvalidItem, IsFileKind, Name, ValidatorKind,
-        VisibilitySummary,
-    },
+    utils::{FileKind, InvalidItem, IsFileKind, Name, ValidatorKind, VisibilitySummary},
     Parsed,
 };
-use solang_parser::pt::{ContractPart, SourceUnitPart};
+use solang_parser::pt::{ContractPart, Loc, SourceUnitPart};
 use std::path::Path;
 
 fn is_matching_file(file: &Path) -> bool {
@@ -14,20 +11,25 @@ fn is_matching_file(file: &Path) -> bool {
 
 #[must_use]
 /// Validates that a script has a single public method named `run`.
+///
+/// # Panics
+///
+/// Panics if the script has no contract definition.
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
-    let Parsed { file, pt, .. } = parsed;
-    if !is_matching_file(file) {
+    if !is_matching_file(&parsed.file) {
         return Vec::new()
     }
 
+    // The location of findings spans multiple lines, so we use the contract location.
+    let mut contract_loc: Option<Loc> = None;
+
+    // Find all public methods that aren't `setUp` or `constructor`.
     let mut public_methods: Vec<String> = Vec::new();
-    for element in &pt.0 {
+    for element in &parsed.pt.0 {
         if let SourceUnitPart::ContractDefinition(c) = element {
+            contract_loc = Some(c.loc);
             for el in &c.parts {
                 if let ContractPart::FunctionDefinition(f) = el {
-                    if is_in_disabled_region(parsed, f.loc) {
-                        continue
-                    }
                     let name = f.name();
                     if f.is_public_or_external() && name != "setUp" && name != "constructor" {
                         public_methods.push(name);
@@ -43,9 +45,9 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
         0 => {
             vec![InvalidItem::new(
                 ValidatorKind::Script,
-                file.display().to_string(),
+                parsed,
+                contract_loc.unwrap(), //
                 "No `run` method found".to_string(),
-                0, // This spans multiple lines, so we don't have a line number.
             )]
         }
         1 => {
@@ -54,18 +56,19 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
             } else {
                 vec![InvalidItem::new(
                     ValidatorKind::Script,
-                    file.display().to_string(),
+                    parsed,
+                    contract_loc.unwrap(),
                     "The only public method must be named `run`".to_string(),
-                    0,
                 )]
             }
         }
         _ => {
             vec![InvalidItem::new(
               ValidatorKind::Script,
-              file.display().to_string(),
+                parsed,
+                contract_loc.unwrap(),
               format!("Scripts must have a single public method named `run` (excluding `setUp`), but the following methods were found: {public_methods:?}"),
-              0,
+
           )]
         }
     }
