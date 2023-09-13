@@ -69,7 +69,7 @@ pub struct Parsed {
     pub file: PathBuf,
     /// The original source code.
     pub src: String,
-    /// The Parse Tree via [`solang`].
+    /// The Parse Tree via [`solang_parser`].
     pub pt: SourceUnit,
     /// Parsed comments.
     pub comments: Comments,
