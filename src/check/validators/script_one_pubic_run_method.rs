@@ -50,26 +50,17 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
                 "No `run` method found".to_string(),
             )]
         }
-        1 => {
-            if public_methods[0] == "run" {
+        _ => {
+            if public_methods.contains(&"run".to_string()) {
                 Vec::new()
             } else {
                 vec![InvalidItem::new(
                     ValidatorKind::Script,
                     parsed,
-                    contract_loc.unwrap(),
-                    "The only public method must be named `run`".to_string(),
+                    contract_loc.unwrap(), //
+                    "No `run` method found".to_string(),
                 )]
             }
-        }
-        _ => {
-            vec![InvalidItem::new(
-              ValidatorKind::Script,
-                parsed,
-                contract_loc.unwrap(),
-              format!("Scripts must have a single public method named `run` (excluding `setUp`), but the following methods were found: {public_methods:?}"),
-
-          )]
         }
     }
 }
@@ -88,6 +79,26 @@ mod tests {
             }
         "#;
 
+        let content_good_variant0 = r#"
+            contract MyContract {
+                function run() public {}
+                function run(string memory config) public {}
+            }
+        "#;
+
+        let content_good_variant1 = r#"
+            contract MyContract {
+                function run() public {}
+                function foo() public {}
+            }
+        "#;
+
+        let content_good_variant2 = r#"
+            contract MyContract {
+                function run(address admin) public {}
+            }
+        "#;
+
         // The number after `bad` on the variable name indicates the match arm covered.
         let content_bad0 = r#"
             contract MyContract {}
@@ -101,20 +112,6 @@ mod tests {
 
         let content_bad2_variant0 = r#"
             contract MyContract {
-                function run() public {}
-                function run(string memory config) public {}
-            }
-        "#;
-
-        let content_bad2_variant1 = r#"
-            contract MyContract {
-                function run() public {}
-                function foo() public {}
-            }
-        "#;
-
-        let content_bad2_variant2 = r#"
-            contract MyContract {
                 function foo() public {}
                 function bar() public {}
             }
@@ -122,12 +119,13 @@ mod tests {
 
         let expected_findings_good = ExpectedFindings::new(0);
         expected_findings_good.assert_eq(content_good, &validate);
+        expected_findings_good.assert_eq(content_good_variant0, &validate);
+        expected_findings_good.assert_eq(content_good_variant1, &validate);
+        expected_findings_good.assert_eq(content_good_variant2, &validate);
 
         let expected_findings_bad = ExpectedFindings { script: 1, ..Default::default() };
         expected_findings_bad.assert_eq(content_bad0, &validate);
         expected_findings_bad.assert_eq(content_bad1, &validate);
         expected_findings_bad.assert_eq(content_bad2_variant0, &validate);
-        expected_findings_bad.assert_eq(content_bad2_variant1, &validate);
-        expected_findings_bad.assert_eq(content_bad2_variant2, &validate);
     }
 }
