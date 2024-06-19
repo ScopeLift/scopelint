@@ -73,49 +73,49 @@ mod tests {
     #[test]
     fn test_validate() {
         // TODO add another test for the third match arm
-        let content_good = r#"
+        let content_good = r"
             contract MyContract {
                 function run() public {}
             }
-        "#;
+        ";
 
-        let content_good_variant0 = r#"
+        let content_good_variant0 = r"
             contract MyContract {
                 function run() public {}
                 function run(string memory config) public {}
             }
-        "#;
+        ";
 
-        let content_good_variant1 = r#"
+        let content_good_variant1 = r"
             contract MyContract {
                 function run() public {}
                 function foo() public {}
             }
-        "#;
+        ";
 
-        let content_good_variant2 = r#"
+        let content_good_variant2 = r"
             contract MyContract {
                 function run(address admin) public {}
             }
-        "#;
+        ";
 
         // The number after `bad` on the variable name indicates the match arm covered.
-        let content_bad0 = r#"
+        let content_bad0 = r"
             contract MyContract {}
-        "#;
+        ";
 
-        let content_bad1 = r#"
+        let content_bad1 = r"
             contract MyContract {
                 function notRun() public {}
             }
-        "#;
+        ";
 
-        let content_bad2_variant0 = r#"
+        let content_bad2_variant0 = r"
             contract MyContract {
                 function foo() public {}
                 function bar() public {}
             }
-        "#;
+        ";
 
         let expected_findings_good = ExpectedFindings::new(0);
         expected_findings_good.assert_eq(content_good, &validate);
