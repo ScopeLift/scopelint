@@ -16,5 +16,5 @@
   once_cell = "1.16.0"
   regex = "1.6.0"
   solang-parser = "0.3.2"
-  taplo = "0.12.1"
+  taplo = "0.13.0"
   walkdir = "2.3.2"
