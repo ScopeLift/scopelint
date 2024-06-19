@@ -1,13 +1,13 @@
-# ScopeLint
+# `ScopeLint`
 
 A simple and opinionated tool designed for basic formatting/linting of Solidity and TOML code in foundry projects.
 
-- [Installation](#installation)
-- [Usage](#usage)
-  - [`scopelint fmt`](#scopelint-fmt)
-  - [`scopelint check`](#scopelint-check)
-  - [`scopelint spec`](#scopelint-spec)
-
+- [`ScopeLint`](#scopelint)
+  - [Installation](#installation)
+  - [Usage](#usage)
+    - [`scopelint fmt`](#scopelint-fmt)
+    - [`scopelint check`](#scopelint-check)
+    - [`scopelint spec`](#scopelint-spec)
 
 ## Installation
 

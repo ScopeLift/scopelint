@@ -87,7 +87,7 @@ pub fn parse(file: &Path) -> Result<Parsed, Box<dyn Error>> {
     let src = &fs::read_to_string(file)?;
 
     let (pt, comments) = solang_parser::parse(src, 0).map_err(|d| {
-        eprintln!("{:?}", d);
+        eprintln!("{d:?}");
         "Failed to parse file".to_string()
     })?;
 

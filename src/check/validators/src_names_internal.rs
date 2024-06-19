@@ -62,7 +62,7 @@ mod tests {
 
     #[test]
     fn test_validate() {
-        let content = r#"
+        let content = r"
             contract MyContract {
                 // Valid names for internal or private src methods.
                 function _myInternalMethod() internal {}
@@ -76,7 +76,7 @@ mod tests {
                 function myPublicMethod() public {}
                 function myExternalMethod() external {}
             }
-        "#;
+        ";
 
         let expected_findings = ExpectedFindings { src: 2, ..ExpectedFindings::default() };
         expected_findings.assert_eq(content, &validate);
