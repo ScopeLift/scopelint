@@ -256,7 +256,6 @@ fn trimmed_fn_name_to_requirement(trimmed_fn_name: &str) -> String {
     trimmed_fn_name
         .replace('_', ":")
         .chars()
-        .enumerate()
-        .map(|(_i, c)| if c.is_uppercase() { format!(" {c}") } else { c.to_string() })
+        .map(|c| if c.is_uppercase() { format!(" {c}") } else { c.to_string() })
         .collect::<String>()
 }

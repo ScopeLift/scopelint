@@ -95,7 +95,7 @@ mod tests {
 
     #[test]
     fn test_validate() {
-        let content = r#"
+        let content = r"
             contract MyContract {
                 // Good test names.
                 function test_Description() public {}
@@ -117,7 +117,7 @@ mod tests {
                 function _testDescription() public {}
                 function _testDescriptionMoreInfo() public {}
             }
-        "#;
+        ";
 
         let expected_findings = ExpectedFindings { test: 3, ..ExpectedFindings::default() };
         expected_findings.assert_eq(content, &validate);
@@ -172,11 +172,11 @@ mod tests {
         ];
 
         for name in allowed_names {
-            assert_eq!(is_valid_test_name(name), true, "{name}");
+            assert!(is_valid_test_name(name), "{name}");
         }
 
         for name in disallowed_names {
-            assert_eq!(is_valid_test_name(name), false, "{name}");
+            assert!(!is_valid_test_name(name), "{name}");
         }
     }
 }

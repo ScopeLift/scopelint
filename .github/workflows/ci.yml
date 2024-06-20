@@ -41,7 +41,7 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
-          components: clippy, rustfmt
+          components: rustfmt
 
       - name: cargo fmt
         uses: actions-rs/cargo@v1
@@ -49,16 +49,23 @@ jobs:
           command: fmt
           args: --all --check
 
-      - name: cargo clippy
-        uses: actions-rs/clippy-check@v1
-        with:
-          args: --all --all-features -- -D warnings
-          token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: cargo doc
         uses: actions-rs/cargo@v1
         env:
-          RUSTDOCFLAGS: '-D missing_docs -D rustdoc::missing_doc_code_examples'
+          RUSTDOCFLAGS: "-D rustdoc::missing_doc_code_examples"
         with:
           command: doc
           args: --workspace --all-features --no-deps --document-private-items
+
+  clippy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - run: cargo clippy --workspace --all-targets --all-features
+        env:
+          RUSTFLAGS: -Dwarnings

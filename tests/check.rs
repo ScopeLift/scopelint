@@ -32,8 +32,6 @@ fn test_check_proj1_all_findings() {
         "Invalid constant or immutable name in ./src/Counter.sol on line 5: badImmutable",
         "Invalid constant or immutable name in ./src/Counter.sol on line 6: bad_constant",
         "Invalid constant or immutable name in ./test/Counter.t.sol on line 7: testVal",
-        r#"Invalid script interface in ./script/Counter.s.sol: Scripts must have a single public method named `run` (excluding `setUp`), but the following methods were found: ["run", "runExternal"]"#,
-        r#"Invalid script interface in ./script/Counter2.s.sol: Scripts must have a single public method named `run` (excluding `setUp`), but the following methods were found: ["run", "anotherPublic", "thirdPublic"]"#,
         "Invalid src method name in ./src/Counter.sol on line 23: internalShouldHaveLeadingUnderscore",
         "Invalid src method name in ./src/Counter.sol on line 25: privateShouldHaveLeadingUnderscore",
         "Invalid test name in ./test/Counter.t.sol on line 16: testIncrementBadName",

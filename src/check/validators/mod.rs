@@ -5,7 +5,7 @@ pub mod formatting;
 pub mod constant_names;
 
 /// Validates that a script has a single public method named `run`.
-pub mod script_one_pubic_run_method;
+pub mod script_has_public_run_method;
 
 /// Validates that internal and private function names are prefixed with an underscore.
 pub mod src_names_internal;

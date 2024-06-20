@@ -87,7 +87,7 @@ pub fn parse(file: &Path) -> Result<Parsed, Box<dyn Error>> {
     let src = &fs::read_to_string(file)?;
 
     let (pt, comments) = solang_parser::parse(src, 0).map_err(|d| {
-        eprintln!("{:?}", d);
+        eprintln!("{d:?}");
         "Failed to parse file".to_string()
     })?;
 
@@ -140,7 +140,7 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
             // Run all checks.
             results.add_items(validators::test_names::validate(&parsed));
             results.add_items(validators::src_names_internal::validate(&parsed));
-            results.add_items(validators::script_one_pubic_run_method::validate(&parsed));
+            results.add_items(validators::script_has_public_run_method::validate(&parsed));
             results.add_items(validators::constant_names::validate(&parsed));
         }
     }
