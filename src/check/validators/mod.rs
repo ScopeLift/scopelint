@@ -12,3 +12,6 @@ pub mod src_names_internal;
 
 /// Validates that test names are in the correct format.
 pub mod test_names;
+
+/// Validates that local variables are prefixed with an underscore.
+pub mod local_vars;

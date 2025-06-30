@@ -17,7 +17,7 @@ fn is_matching_file(file: &Path) -> bool {
 /// Panics if the script has no contract definition.
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
     if !is_matching_file(&parsed.file) {
-        return Vec::new()
+        return Vec::new();
     }
 
     // The location of findings spans multiple lines, so we use the contract location.

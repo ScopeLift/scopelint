@@ -19,7 +19,7 @@ fn is_matching_file(file: &Path) -> bool {
 /// Validates that test names are in the correct format.
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
     if !is_matching_file(&parsed.file) {
-        return Vec::new()
+        return Vec::new();
     }
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
@@ -48,7 +48,7 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
 fn is_valid_test_name(name: &str) -> bool {
     // Check that name matches the allowed pattern.
     if !name.starts_with("test") || !RE_VALID_TEST_NAME.is_match(name) {
-        return false
+        return false;
     }
 
     // Verify the revert naming convention. This is a workaround for the regex create not supporting
@@ -59,7 +59,7 @@ fn is_valid_test_name(name: &str) -> bool {
     for segment in segments {
         // If the segment contains `Revert` but does not start with `Revert` it is invalid.
         if segment.contains("Revert") && !segment.starts_with("Revert") {
-            return false
+            return false;
         }
 
         // If the segment starts with `Revert` it is valid if the rest of the segment is exactly
