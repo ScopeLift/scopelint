@@ -7,7 +7,7 @@
   license = "MIT"
   name = "scopelint"
   repository = "https://github.com/ScopeLift/scopelint"
-  version = "0.0.21"
+  version = "0.0.22"
 
 [dependencies]
   clap = { version = "4.4.2", features = ["derive"] }
