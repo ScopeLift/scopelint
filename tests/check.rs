@@ -23,6 +23,11 @@ fn test_check_proj1_all_findings() {
     let output = run_scopelint("check-proj1-AllFindings");
     let stderr = String::from_utf8(output.stderr).unwrap();
     let findings: Vec<&str> = stderr.split("\n").collect();
+    
+    // Filter out the Foundry warning line
+    let findings: Vec<&str> = findings.into_iter()
+        .filter(|line| !line.contains("Warning: This is a nightly build of Foundry"))
+        .collect();
 
     let expected_findings = [
         "Invalid constant or immutable name in ./script/Counter.s.sol on line 7: VERY_bad_constant",
@@ -69,6 +74,11 @@ fn test_check_proj2_no_findings() {
     let stderr = String::from_utf8(output.stderr).unwrap();
     let findings: Vec<&str> = stderr.split("\n").collect();
 
+    // Filter out the Foundry warning line
+    let findings: Vec<&str> = findings.into_iter()
+        .filter(|line| !line.contains("Warning: This is a nightly build of Foundry"))
+        .collect();
+    
     let expected_findings = [
         "Invalid local variable name in ./src/Counter.sol on line 13: newNumber",
         "error: Convention checks failed, see details above",
