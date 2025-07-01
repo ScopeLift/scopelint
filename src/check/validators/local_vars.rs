@@ -50,7 +50,7 @@ fn validate_function(parsed: &Parsed, f: &FunctionDefinition) -> Vec<InvalidItem
             if let Some(name) = &p.name {
                 if !is_valid_local_var_name(&name.name) {
                     invalid_items.push(InvalidItem::new(
-                        ValidatorKind::Src,
+                        ValidatorKind::LocalVar,
                         parsed,
                         p.loc,
                         name.name.clone(),
@@ -66,7 +66,7 @@ fn validate_function(parsed: &Parsed, f: &FunctionDefinition) -> Vec<InvalidItem
             if let Some(name) = &p.name {
                 if !is_valid_local_var_name(&name.name) {
                     invalid_items.push(InvalidItem::new(
-                        ValidatorKind::Src,
+                        ValidatorKind::LocalVar,
                         parsed,
                         p.loc,
                         name.name.clone(),
@@ -91,7 +91,7 @@ fn validate_statement(parsed: &Parsed, stmt: &Statement) -> Vec<InvalidItem> {
         Statement::VariableDefinition(loc, VariableDeclaration { name: Some(name), .. }, _) => {
             if !is_valid_local_var_name(&name.name) {
                 invalid_items.push(InvalidItem::new(
-                    ValidatorKind::Src,
+                    ValidatorKind::LocalVar,
                     parsed,
                     *loc,
                     name.name.clone(),
@@ -129,7 +129,7 @@ fn validate_statement(parsed: &Parsed, stmt: &Statement) -> Vec<InvalidItem> {
                         if let Some(name) = &p.name {
                             if !is_valid_local_var_name(&name.name) {
                                 invalid_items.push(InvalidItem::new(
-                                    ValidatorKind::Src,
+                                    ValidatorKind::LocalVar,
                                     parsed,
                                     p.loc,
                                     name.name.clone(),
@@ -148,7 +148,7 @@ fn validate_statement(parsed: &Parsed, stmt: &Statement) -> Vec<InvalidItem> {
                             if let Some(name) = &p.name {
                                 if !is_valid_local_var_name(&name.name) {
                                     invalid_items.push(InvalidItem::new(
-                                        ValidatorKind::Src,
+                                        ValidatorKind::LocalVar,
                                         parsed,
                                         p.loc,
                                         name.name.clone(),
@@ -162,7 +162,7 @@ fn validate_statement(parsed: &Parsed, stmt: &Statement) -> Vec<InvalidItem> {
                         if let Some(name) = &param.name {
                             if !is_valid_local_var_name(&name.name) {
                                 invalid_items.push(InvalidItem::new(
-                                    ValidatorKind::Src,
+                                    ValidatorKind::LocalVar,
                                     parsed,
                                     param.loc,
                                     name.name.clone(),
@@ -192,7 +192,7 @@ fn validate_yul_block(parsed: &Parsed, block: &solang_parser::pt::YulBlock) -> V
                 for name in names {
                     if !is_valid_local_var_name(&name.id.name) {
                         invalid_items.push(InvalidItem::new(
-                            ValidatorKind::Src,
+                            ValidatorKind::LocalVar,
                             parsed,
                             *loc,
                             name.id.name.clone(),

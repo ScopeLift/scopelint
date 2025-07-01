@@ -26,6 +26,8 @@ pub enum ValidatorKind {
     Test,
     /// A `// scopelint: <directive>` comment.
     Directive,
+    /// A local variable
+    LocalVar,
 }
 
 /// A single invalid item found by a validator.
@@ -73,6 +75,12 @@ impl InvalidItem {
             }
             ValidatorKind::Directive => {
                 format!("Invalid directive in {}: {}", self.file, self.text)
+            }
+            ValidatorKind::LocalVar => {
+                format!(
+                    "Invalid local variable name in {} on line {}: {}",
+                    self.file, self.line, self.text
+                )
             }
         }
     }
