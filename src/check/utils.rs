@@ -87,6 +87,7 @@ impl InvalidItem {
 }
 
 /// Categories of file kinds found in forge projects.
+///
 /// Two additional file kinds are not included here: `ScriptHelpers` and `TestHelpers`. These are
 /// not currently used in any checks so they are excluded for now.
 pub enum FileKind {
