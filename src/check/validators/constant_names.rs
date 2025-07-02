@@ -2,14 +2,13 @@ use crate::check::{
     utils::{InvalidItem, ValidatorKind},
     Parsed,
 };
-use once_cell::sync::Lazy;
 use regex::Regex;
 use solang_parser::pt::{ContractPart, SourceUnitPart, VariableAttribute, VariableDefinition};
-use std::path::Path;
+use std::{path::Path, sync::LazyLock};
 
 // A regex matching valid constant names, see the `validate_constant_names_regex` test for examples.
-static RE_VALID_CONSTANT_NAME: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(?:[$_]*[A-Z0-9][$_]*){1,}$").unwrap());
+static RE_VALID_CONSTANT_NAME: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(?:[$_]*[A-Z0-9][$_]*){1,}$").unwrap());
 
 const fn is_matching_file(_file: &Path) -> bool {
     true

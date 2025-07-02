@@ -26,7 +26,7 @@ pub enum ValidatorKind {
     Test,
     /// A `// scopelint: <directive>` comment.
     Directive,
-    /// A local variable
+    /// A local variable.
     LocalVar,
 }
 
