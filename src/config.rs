@@ -24,5 +24,9 @@ pub enum Subcommands {
     },
     #[clap(about = "Generates a specification for the current project from test names.")]
     /// Generates a specification for the current project from test names.
-    Spec,
+    Spec {
+        #[clap(long, help = "Show internal functions in the specification.")]
+        /// Show internal functions in the specification.
+        show_internal: bool,
+    },
 }

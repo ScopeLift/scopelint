@@ -36,6 +36,6 @@ pub fn run(opts: &config::Opts) -> Result<(), Box<dyn Error>> {
     match &opts.subcommand {
         config::Subcommands::Check => check::run(taplo_opts),
         config::Subcommands::Fmt { check } => fmt::run(taplo_opts, *check),
-        config::Subcommands::Spec => spec::run(),
+        config::Subcommands::Spec { show_internal } => spec::run(*show_internal),
     }
 }

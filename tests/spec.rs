@@ -18,9 +18,45 @@ fn run_scopelint(test_folder: &str) -> Output {
         .expect("Failed to execute command")
 }
 
+fn run_scopelint_with_flag(test_folder: &str, flag: &str) -> Output {
+    let cwd = env::current_dir().unwrap();
+    let project_path = cwd.join("tests").join(test_folder);
+    let binary_path = cwd.join("target/debug/scopelint");
+
+    Command::new(binary_path)
+        .current_dir(project_path)
+        .args(["spec", flag])
+        .output()
+        .expect("Failed to execute command")
+}
+
 #[test]
-fn test_spec_proj1() {
+fn test_spec_proj1_default() {
     let output = run_scopelint("spec-proj1");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let expected_spec = r#"
+Contract Specification: ERC20
+├── approve
+│   ├──  Sets Allowance Mapping To Approved Amount
+│   ├──  Returns True For Successful Approval
+│   └──  Emits Approval Event
+├── transfer
+│   ├──  Revert If: Spender Has Insufficient Balance
+│   ├──  Does Not Change Total Supply
+│   ├──  Increases Recipient Balance By Sent Amount
+│   ├──  Decreases Sender Balance By Sent Amount
+│   ├──  Returns True
+│   └──  Emits Transfer Event
+├── transferFrom
+├── permit
+└── DOMAIN_SEPARATOR
+"#;
+    assert_eq!(stdout, expected_spec);
+}
+
+#[test]
+fn test_spec_proj1_with_show_internal() {
+    let output = run_scopelint_with_flag("spec-proj1", "--show-internal");
     let stdout = String::from_utf8(output.stdout).unwrap();
     let expected_spec = r#"
 Contract Specification: ERC20

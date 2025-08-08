@@ -64,6 +64,9 @@ Below is a simple example for an ERC-20 token, the full example repo can be foun
 
 ![erc20-scopelint-spec-example](./assets/spec.gif)
 
+**Flags:**
+- `--show-internal`: Include internal and private functions in the specification (by default, only public and external functions are shown)
+
 Currently this feature is in beta, and we are looking for feedback on how to improve it.
 Right now it's focused on specifications for unit tests, which are very useful for developers but less useful for higher-level stakeholders.
 As a result, it does not yet include information about protocol invariants or integration test / user-story types of specifications.

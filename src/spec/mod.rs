@@ -20,15 +20,15 @@ use walkdir::WalkDir;
 /// Returns an error if the specification could not be generated from the Solidity code.
 /// # Panics
 /// Panics when a file path could not be unwrapped.
-pub fn run() -> Result<(), Box<dyn Error>> {
+pub fn run(show_internal: bool) -> Result<(), Box<dyn Error>> {
     // =================================
     // ======== Parse contracts ========
     // =================================
 
     // First, parse all source and test files to collect the contracts and their methods. All free
     // functions are added under a special contract called `FreeFunctions`.
-    let src_contracts = get_contracts_for_dir("./src", ".sol");
-    let test_contracts = get_contracts_for_dir("./test", ".t.sol");
+    let src_contracts = get_contracts_for_dir("./src", ".sol", show_internal);
+    let test_contracts = get_contracts_for_dir("./test", ".t.sol", show_internal);
 
     // ========================================
     // ======== Generate Specification ========
@@ -72,8 +72,9 @@ struct ParsedContract {
 }
 
 impl ParsedContract {
-    fn new(path: PathBuf, contract: Option<ContractDefinition>) -> Self {
-        let functions = contract.as_ref().map_or(Vec::new(), get_functions_from_contract);
+    fn new(path: PathBuf, contract: Option<ContractDefinition>, show_internal: bool) -> Self {
+        let functions =
+            contract.as_ref().map_or(Vec::new(), |c| get_functions_from_contract(c, show_internal));
         Self { path, contract, functions }
     }
 
@@ -201,7 +202,11 @@ impl ProtocolSpecification {
 // ======== Helper functions ========
 // ==================================
 
-fn get_contracts_for_dir<P: AsRef<Path>>(dir: P, extension: &str) -> Vec<ParsedContract> {
+fn get_contracts_for_dir<P: AsRef<Path>>(
+    dir: P,
+    extension: &str,
+    show_internal: bool,
+) -> Vec<ParsedContract> {
     let mut contracts: Vec<ParsedContract> = Vec::new();
     for result in WalkDir::new(dir) {
         let dent = match result {
@@ -217,13 +222,13 @@ fn get_contracts_for_dir<P: AsRef<Path>>(dir: P, extension: &str) -> Vec<ParsedC
             continue;
         }
 
-        let new_contracts = parse_contracts(file);
+        let new_contracts = parse_contracts(file, show_internal);
         contracts.extend(new_contracts);
     }
     contracts
 }
 
-fn parse_contracts(file: &Path) -> Vec<ParsedContract> {
+fn parse_contracts(file: &Path, show_internal: bool) -> Vec<ParsedContract> {
     let content = fs::read_to_string(file).unwrap();
     let (pt, _comments) = solang_parser::parse(&content, 0).expect("Parsing failed");
     let mut contracts: Vec<ParsedContract> = Vec::new();
@@ -239,7 +244,11 @@ fn parse_contracts(file: &Path) -> Vec<ParsedContract> {
                     continue;
                 }
 
-                contracts.push(ParsedContract::new(file.to_path_buf(), Some(*c.clone())));
+                contracts.push(ParsedContract::new(
+                    file.to_path_buf(),
+                    Some(*c.clone()),
+                    show_internal,
+                ));
             }
             _ => (),
         }
@@ -247,11 +256,16 @@ fn parse_contracts(file: &Path) -> Vec<ParsedContract> {
     contracts
 }
 
-fn get_functions_from_contract(contract: &ContractDefinition) -> Vec<FunctionDefinition> {
+fn get_functions_from_contract(
+    contract: &ContractDefinition,
+    show_internal: bool,
+) -> Vec<FunctionDefinition> {
     let mut functions = Vec::new();
     for element in &contract.parts {
         if let ContractPart::FunctionDefinition(f) = element {
-            functions.push(*f.clone());
+            if show_internal || f.is_public_or_external() {
+                functions.push(*f.clone());
+            }
         }
     }
     functions
