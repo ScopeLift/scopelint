@@ -50,3 +50,12 @@ Contract Specification: ERC20
 "#;
     assert_eq!(stdout, expected_spec);
 }
+
+#[test]
+fn test_spec_proj2_empty_contract() {
+    let output = run_scopelint("spec-proj2-EmptyContract");
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    // Empty contracts should be ignored and produce no output
+    let expected_spec = "";
+    assert_eq!(stdout, expected_spec);
+}

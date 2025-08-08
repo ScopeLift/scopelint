@@ -41,6 +41,11 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     //     contract contains that source method's tests/specification.
     let mut protocol_spec = ProtocolSpecification::new();
     for src_contract in src_contracts {
+        // Skip contracts with no functions - they have nothing to specify
+        if src_contract.functions.is_empty() {
+            continue;
+        }
+
         let mut contract_specification = ContractSpecification::new(src_contract.clone());
         let src_contract_name = src_contract.contract.unwrap().name.unwrap().name;
 
@@ -114,6 +119,7 @@ impl ContractSpecification {
         // which is the order we want to print in.
         let src_fns = &self.src_contract.functions;
         let num_src_fns = src_fns.len();
+
         for (i, src_fn) in src_fns.iter().enumerate() {
             let src_fn_name_prefix = if i == num_src_fns - 1 { "└── " } else { "├── " };
 
