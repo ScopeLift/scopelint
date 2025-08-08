@@ -8,6 +8,7 @@ A simple and opinionated tool designed for basic formatting/linting of Solidity 
     - [`scopelint fmt`](#scopelint-fmt)
     - [`scopelint check`](#scopelint-check)
     - [`scopelint spec`](#scopelint-spec)
+  - [Development](#development)
 
 ## Installation
 
@@ -64,3 +65,13 @@ Currently this feature is in beta, and we are looking for feedback on how to imp
 Right now it's focused on specifications for unit tests, which are very useful for developers but less useful for higher-level stakeholders.
 As a result, it does not yet include information about protocol invariants or integration test / user-story types of specifications.
 If you have any thoughts or ideas, please open an issue [here](https://github.com/ScopeLift/scopelint/issues/new).
+
+## Development
+
+For developers interested in contributing to `scopelint`, please see our [Development Guide](DEV.md) for detailed information about:
+
+- Setting up the development environment
+- Project structure and architecture
+- Adding new validators and features
+- Testing and code quality standards
+- Contributing guidelines
