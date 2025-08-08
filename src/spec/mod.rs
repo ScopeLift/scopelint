@@ -75,7 +75,7 @@ impl ParsedContract {
     fn contract_name(&self) -> String {
         self.contract
             .as_ref()
-            .map_or("FreeFunctions".to_string(), |c| c.name.as_ref().unwrap().name.clone())
+            .map_or_else(|| "FreeFunctions".to_string(), |c| c.name.as_ref().unwrap().name.clone())
     }
 
     fn contract_name_from_file(&self) -> String {
@@ -121,7 +121,7 @@ impl ContractSpecification {
                 .iter()
                 .find(|tc| {
                     // Find the test contract with the same name
-                    tc.contract_name().to_ascii_lowercase() == src_fn.name().to_ascii_lowercase()
+                    tc.contract_name().eq_ignore_ascii_case(&src_fn.name())
                 })
                 .map_or_else(
                     // If there's no matching test contract, print the name of the source function

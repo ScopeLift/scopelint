@@ -2,14 +2,14 @@ use crate::check::{
     utils::{FileKind, InvalidItem, IsFileKind, Name, ValidatorKind, VisibilitySummary},
     Parsed,
 };
-use once_cell::sync::Lazy;
 use regex::Regex;
 use solang_parser::pt::{ContractPart, FunctionDefinition, SourceUnitPart};
-use std::path::Path;
+use std::{path::Path, sync::LazyLock};
 
 // A regex matching valid test names, see the `validate_test_names_regex` test for examples.
-static RE_VALID_TEST_NAME: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^test(Fork)?(Fuzz)?(_Revert(If|When|On|Given))?_(\w+)*$").unwrap());
+static RE_VALID_TEST_NAME: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^test(Fork)?(Fuzz)?(_Revert(If|When|On|Given))?_(\w+)*$").unwrap()
+});
 
 fn is_matching_file(file: &Path) -> bool {
     file.is_file_kind(FileKind::Test)
