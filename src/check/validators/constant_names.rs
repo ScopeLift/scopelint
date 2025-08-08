@@ -19,7 +19,7 @@ const fn is_matching_file(_file: &Path) -> bool {
 /// Validates that constant and immutable variable names are in `ALL_CAPS`.
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
     if !is_matching_file(&parsed.file) {
-        return Vec::new()
+        return Vec::new();
     }
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
@@ -56,7 +56,7 @@ fn validate_name(parsed: &Parsed, v: &VariableDefinition) -> Option<InvalidItem>
         .any(|a| matches!(a, VariableAttribute::Constant(_) | VariableAttribute::Immutable(_)));
 
     if !is_constant {
-        return None
+        return None;
     }
 
     v.name.as_ref().and_then(|name| {

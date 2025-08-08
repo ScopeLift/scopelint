@@ -56,7 +56,7 @@ fn validate_conventions() -> Result<(), Box<dyn Error>> {
     if !results.is_valid() {
         eprint!("{results}");
         eprintln!("{}: Convention checks failed, see details above", "error".bold().red());
-        return Err("Invalid names found".into())
+        return Err("Invalid names found".into());
     }
     Ok(())
 }
@@ -116,12 +116,12 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
                 Ok(dent) => dent,
                 Err(err) => {
                     eprintln!("{err}");
-                    continue
+                    continue;
                 }
             };
 
             if !dent.file_type().is_file() || dent.path().extension() != Some(OsStr::new("sol")) {
-                continue
+                continue;
             }
 
             // Get the parse tree (pt) of the file and extract inline configs.

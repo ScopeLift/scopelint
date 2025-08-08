@@ -13,7 +13,7 @@ fn is_matching_file(file: &Path) -> bool {
 /// Validates that internal and private function names are prefixed with an underscore.
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
     if !is_matching_file(&parsed.file) {
-        return Vec::new()
+        return Vec::new();
     }
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();

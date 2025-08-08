@@ -164,7 +164,7 @@ pub fn offset_to_line(content: &str, start: usize) -> usize {
             line_counter += 1;
         }
         if offset > start {
-            return line_counter
+            return line_counter;
         }
     }
 

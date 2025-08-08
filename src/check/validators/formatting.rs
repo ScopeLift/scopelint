@@ -23,7 +23,7 @@ pub fn validate(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Err
             "{}: Formatting validation failed, run `scopelint fmt` to fix",
             "error".bold().red()
         );
-        return Err("Invalid fmt found".into())
+        return Err("Invalid fmt found".into());
     }
     Ok(())
 }
