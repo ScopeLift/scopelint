@@ -34,6 +34,9 @@ This command will format:
 - Solidity files using the configuration specified in `foundry.toml`.
 - TOML files using a hardcoded configuration that indents keys and sorts them alphabetically to improve readability.
 
+**Flags:**
+- `--check`: Show changes without modifying files (dry run mode)
+
 ### `scopelint check`
 
 This command ensures that development [best practices](https://book.getfoundry.sh/tutorials/best-practices) are consistently followed by validating that:

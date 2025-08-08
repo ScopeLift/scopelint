@@ -17,7 +17,11 @@ pub enum Subcommands {
     Check,
     #[clap(about = "Formats Solidity and TOML files in the codebase.")]
     /// Formats Solidity and TOML files in the codebase.
-    Fmt,
+    Fmt {
+        #[clap(long, help = "Show changes without modifying files")]
+        /// Show changes without modifying files.
+        check: bool,
+    },
     #[clap(about = "Generates a specification for the current project from test names.")]
     /// Generates a specification for the current project from test names.
     Spec,
