@@ -18,9 +18,9 @@ contract CounterTest is Test {
     assertEq(counter.number(), 1);
   }
 
-  function test_SetNumber_GoodName(uint256 x) public {
-    counter.setNumber(x);
-    assertEq(counter.number(), x);
+  function test_SetNumber_GoodName(uint256 _x) public {
+    counter.setNumber(_x);
+    assertEq(counter.number(), _x);
   }
 
   function test_RevertIf_Overflow() public {}
@@ -28,7 +28,7 @@ contract CounterTest is Test {
   function internalShouldHaveLeadingUnderscore() internal {}
 
   function _butInTestsThisIsNotChecked() internal {
-    uint256 x = 1;
+    uint256 _x = 1;
   }
 
   function thatGoesForPrivateToo() private {}

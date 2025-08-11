@@ -14,7 +14,7 @@ contract CounterScript is Script {
   function internalShouldHaveLeadingUnderscore() internal {}
 
   function _butInScriptsThisIsNotChecked() internal {
-    uint256 x = 1;
+    uint256 _x = 1;
   }
 
   function thatGoesForPrivateToo() private {}

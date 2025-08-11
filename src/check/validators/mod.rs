@@ -15,3 +15,6 @@ pub mod test_names;
 
 /// Validates that source files have SPDX license headers.
 pub mod src_spdx_header;
+
+/// Validates that variable names follow the correct naming conventions.
+pub mod variable_names;
