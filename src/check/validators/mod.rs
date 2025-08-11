@@ -21,3 +21,6 @@ pub mod variable_names;
 
 /// Validates that event names are prefixed with `ContractName_`
 pub mod event_prefix;
+
+/// Validates that EIP712 typehashes match their corresponding struct definitions.
+pub mod eip712_typehash;

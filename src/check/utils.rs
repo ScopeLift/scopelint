@@ -30,6 +30,8 @@ pub enum ValidatorKind {
     Variable,
     /// An event definition.
     Event,
+    /// An EIP712 typehash validation issue.
+    Eip712,
 }
 
 /// A single invalid item found by a validator.
@@ -88,6 +90,9 @@ impl InvalidItem {
             }
             ValidatorKind::Event => {
                 format!("Invalid event name in {} on line {}: {}", self.file, self.line, self.text)
+            }
+            ValidatorKind::Eip712 => {
+                format!("Invalid EIP712 typehash in {}: {}", self.file, self.text)
             }
         }
     }
