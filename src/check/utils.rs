@@ -28,6 +28,8 @@ pub enum ValidatorKind {
     Directive,
     /// A variable naming convention.
     Variable,
+    /// An event definition.
+    Event,
 }
 
 /// A single invalid item found by a validator.
@@ -83,6 +85,9 @@ impl InvalidItem {
                     "Invalid variable name in {} on line {}: {}",
                     self.file, self.line, self.text
                 )
+            }
+            ValidatorKind::Event => {
+                format!("Invalid event name in {} on line {}: {}", self.file, self.line, self.text)
             }
         }
     }

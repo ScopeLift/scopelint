@@ -55,6 +55,8 @@ fn test_check_proj1_all_findings() {
         "Invalid variable name in ./src/CounterIgnored3.sol on line 7: State variable '_GOOD__IMMUTABLE_' should NOT have underscore prefix",
         "Invalid variable name in ./test/Counter.t.sol on line 31: Local variable 'x' should have underscore prefix",
         "Invalid variable name in ./test/Counter.t.sol on line 21: Parameter 'x' should have underscore prefix",
+        "Invalid event name in ./src/Counter.sol on line 33: Event 'AnotherInvalidEvent' should be prefixed with 'Counter_'",
+        "Invalid event name in ./src/Counter.sol on line 32: Event 'InvalidEvent' should be prefixed with 'Counter_'",
         "error: Convention checks failed, see details above",
         "error: Formatting validation failed, run `scopelint fmt` to fix",
         "",

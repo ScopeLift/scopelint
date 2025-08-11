@@ -27,6 +27,10 @@ contract Counter {
   function _privateHasLeadingUnderscore() private {
     number += 1000;
   }
+
+  // Invalid event - should be prefixed with "Counter_"
+  event InvalidEvent(uint256 value);
+  event AnotherInvalidEvent();
 }
 
 // scopelint: this directive is invalid

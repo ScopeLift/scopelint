@@ -144,6 +144,7 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
             results.add_items(validators::constant_names::validate(&parsed));
             results.add_items(validators::src_spdx_header::validate(&parsed));
             results.add_items(validators::variable_names::validate(&parsed));
+            results.add_items(validators::event_prefix::validate(&parsed));
         }
     }
     Ok(results)

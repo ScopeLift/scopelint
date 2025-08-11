@@ -18,3 +18,6 @@ pub mod src_spdx_header;
 
 /// Validates that variable names follow the correct naming conventions.
 pub mod variable_names;
+
+/// Validates that event names are prefixed with `ContractName_`
+pub mod event_prefix;
