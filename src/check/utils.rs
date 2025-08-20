@@ -36,6 +36,7 @@ pub struct InvalidItem {
     pub text: String,      // Details to show about the invalid item.
     pub line: usize,       // Line number.
     pub is_disabled: bool, // Whether the invalid item is in a disabled region.
+    pub is_ignored: bool,  // Whether the invalid item is in an ignored region.
 }
 
 impl InvalidItem {
@@ -45,7 +46,8 @@ impl InvalidItem {
         let Parsed { file, src, inline_config, .. } = parsed;
         let line = offset_to_line(src, loc.start());
         let is_disabled = inline_config.is_disabled(loc);
-        Self { kind, file: file.display().to_string(), text, line, is_disabled }
+        let is_ignored = inline_config.is_ignored(loc);
+        Self { kind, file: file.display().to_string(), text, line, is_disabled, is_ignored }
     }
 
     #[must_use]

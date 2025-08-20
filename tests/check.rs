@@ -34,6 +34,7 @@ fn test_check_proj1_all_findings() {
         "Invalid constant or immutable name in ./test/Counter.t.sol on line 7: testVal",
         "Invalid src method name in ./src/Counter.sol on line 23: internalShouldHaveLeadingUnderscore",
         "Invalid src method name in ./src/Counter.sol on line 25: privateShouldHaveLeadingUnderscore",
+        "Invalid src method name in ./src/CounterIgnored4.sol on line 29: missingLeadingUnderscoreAndNotIgnored",
         "Invalid test name in ./test/Counter.t.sol on line 16: testIncrementBadName",
         "Invalid directive in ./src/Counter.sol: Invalid inline config item: this directive is invalid",
         "error: Convention checks failed, see details above",

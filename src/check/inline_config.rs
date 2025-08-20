@@ -23,6 +23,16 @@ pub enum InlineConfigItem {
     DisableStart,
     /// Disables formatting for any code that precedes this and after the previous "disable-start"
     DisableEnd,
+    /// Ignores the next code item for linting rules
+    IgnoreNextItem,
+    /// Ignores the current line for linting rules
+    IgnoreLine,
+    /// Ignores the next line for linting rules
+    IgnoreNextLine,
+    /// Ignores linting rules for any code that follows this and before the next "ignore-end"
+    IgnoreStart,
+    /// Ignores linting rules for any code that precedes this and after the previous "ignore-start"
+    IgnoreEnd,
 }
 
 impl FromStr for InlineConfigItem {
@@ -34,6 +44,11 @@ impl FromStr for InlineConfigItem {
             "disable-next-line" => InlineConfigItem::DisableNextLine,
             "disable-start" => InlineConfigItem::DisableStart,
             "disable-end" => InlineConfigItem::DisableEnd,
+            "ignore-next-item" => InlineConfigItem::IgnoreNextItem,
+            "ignore-line" => InlineConfigItem::IgnoreLine,
+            "ignore-next-line" => InlineConfigItem::IgnoreNextLine,
+            "ignore-start" => InlineConfigItem::IgnoreStart,
+            "ignore-end" => InlineConfigItem::IgnoreEnd,
             s => return Err(InvalidInlineConfigItem(s.into())),
         })
     }
@@ -64,23 +79,45 @@ impl DisabledRange {
     }
 }
 
-/// An inline config. Keeps track of disabled ranges.
-///
+/// An ignored formatting range. `loose` designates that the range includes any loc which
+/// may start in between start and end, whereas the strict version requires that
+/// `range.start >= loc.start <=> loc.end <= range.end`
+#[derive(Debug)]
+struct IgnoredRange {
+    start: usize,
+    end: usize,
+    loose: bool,
+}
+
+impl IgnoredRange {
+    fn includes(&self, loc: Loc) -> bool {
+        loc.start() >= self.start && (if self.loose { loc.start() } else { loc.end() } <= self.end)
+    }
+}
+
 /// This is a list of Inline Config items for locations in a source file. This is acquired by
 /// parsing the comments for `scopelint:` items. See [`Comments::parse_inline_config_items`] for
 /// details.
 #[derive(Default, Debug)]
 pub struct InlineConfig {
     disabled_ranges: Vec<DisabledRange>,
+    ignored_ranges: Vec<IgnoredRange>,
 }
 
 impl InlineConfig {
     /// Build a new inline config with an iterator of inline config items and their locations in a
     /// source file
     pub fn new(items: impl IntoIterator<Item = (Loc, InlineConfigItem)>, src: &str) -> Self {
+        // Disable ranges (for formatting)
         let mut disabled_ranges = vec![];
         let mut disabled_range_start = None;
         let mut disabled_depth = 0usize;
+
+        // Ignore ranges (for linting)
+        let mut ignored_ranges = vec![];
+        let mut ignored_range_start = None;
+        let mut ignored_depth = 0usize;
+
         for (loc, item) in items.into_iter().sorted_by_key(|(loc, _)| loc.start()) {
             match item {
                 InlineConfigItem::DisableNextItem => {
@@ -145,16 +182,99 @@ impl InlineConfig {
                         }
                     }
                 }
+                InlineConfigItem::IgnoreNextItem => {
+                    let offset = loc.end();
+                    let mut char_indices = src[offset..]
+                        .comment_state_char_indices()
+                        .filter_map(|(state, idx, ch)| match state {
+                            CommentState::None => Some((idx, ch)),
+                            _ => None,
+                        })
+                        .skip_while(|(_, ch)| ch.is_whitespace());
+                    if let Some((mut start, _)) = char_indices.next() {
+                        start += offset;
+                        // Find the end of the function declaration by looking for the closing brace
+                        let mut brace_count = 0;
+                        let mut found_function_start = false;
+                        let mut end = src.len();
+
+                        for (idx, ch) in src[start..].char_indices() {
+                            if ch == '{' {
+                                brace_count += 1;
+                                found_function_start = true;
+                            } else if ch == '}' {
+                                brace_count -= 1;
+                                if found_function_start && brace_count == 0 {
+                                    end = start + idx + 1;
+                                    break;
+                                }
+                            }
+                        }
+                        ignored_ranges.push(IgnoredRange { start, end, loose: true });
+                    }
+                }
+                InlineConfigItem::IgnoreLine => {
+                    let mut prev_newline =
+                        src[..loc.start()].char_indices().rev().skip_while(|(_, ch)| *ch != '\n');
+                    let start = prev_newline.next().map(|(idx, _)| idx).unwrap_or_default();
+
+                    let end_offset = loc.end();
+                    let mut next_newline =
+                        src[end_offset..].char_indices().skip_while(|(_, ch)| *ch != '\n');
+                    let end =
+                        end_offset + next_newline.next().map(|(idx, _)| idx).unwrap_or_default();
+
+                    ignored_ranges.push(IgnoredRange { start, end, loose: false });
+                }
+                InlineConfigItem::IgnoreNextLine => {
+                    let offset = loc.end();
+                    let mut char_indices =
+                        src[offset..].char_indices().skip_while(|(_, ch)| *ch != '\n').skip(1);
+                    if let Some((mut start, _)) = char_indices.next() {
+                        start += offset;
+                        let end = char_indices
+                            .find(|(_, ch)| *ch == '\n')
+                            .map(|(idx, _)| offset + idx + 1)
+                            .unwrap_or(src.len());
+                        ignored_ranges.push(IgnoredRange { start, end, loose: false });
+                    }
+                }
+                InlineConfigItem::IgnoreStart => {
+                    if ignored_depth == 0 {
+                        ignored_range_start = Some(loc.end());
+                    }
+                    ignored_depth += 1;
+                }
+                InlineConfigItem::IgnoreEnd => {
+                    ignored_depth = ignored_depth.saturating_sub(1);
+                    if ignored_depth == 0 {
+                        if let Some(start) = ignored_range_start.take() {
+                            ignored_ranges.push(IgnoredRange {
+                                start,
+                                end: loc.start(),
+                                loose: false,
+                            })
+                        }
+                    }
+                }
             }
         }
         if let Some(start) = disabled_range_start.take() {
             disabled_ranges.push(DisabledRange { start, end: src.len(), loose: false })
         }
-        Self { disabled_ranges }
+        if let Some(start) = ignored_range_start.take() {
+            ignored_ranges.push(IgnoredRange { start, end: src.len(), loose: false })
+        }
+        Self { disabled_ranges, ignored_ranges }
     }
 
     /// Check if the location is in a disabled range
     pub fn is_disabled(&self, loc: Loc) -> bool {
         self.disabled_ranges.iter().any(|range| range.includes(loc))
+    }
+
+    /// Check if the location is in an ignored range
+    pub fn is_ignored(&self, loc: Loc) -> bool {
+        self.ignored_ranges.iter().any(|range| range.includes(loc))
     }
 }

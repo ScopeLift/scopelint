@@ -13,7 +13,7 @@ impl fmt::Display for Report {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         self.invalid_items
             .iter()
-            .filter(|item| !item.is_disabled)
+            .filter(|item| !item.is_disabled && !item.is_ignored)
             .sorted_unstable()
             .try_for_each(|item| writeln!(f, "{}", item.description()))
     }
@@ -33,6 +33,6 @@ impl Report {
     /// Returns true if no issues were found.
     #[must_use]
     pub fn is_valid(&self) -> bool {
-        !self.invalid_items.iter().any(|item| !item.is_disabled)
+        !self.invalid_items.iter().any(|item| !item.is_disabled && !item.is_ignored)
     }
 }
