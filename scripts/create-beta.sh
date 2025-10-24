@@ -33,14 +33,10 @@ echo "🏷️  Creating git tag..."
 git tag $TAG_NAME || echo "Tag $TAG_NAME already exists, skipping..."
 git push origin $TAG_NAME || echo "Tag $TAG_NAME already pushed, skipping..."
 
-# Step 4: Create GitHub release
-echo "📦 Creating GitHub release..."
-gh release create $TAG_NAME --prerelease target/release/$BIN_NAME
-
 echo ""
 echo "✅ Beta release created successfully!"
 echo "📦 Tag: $TAG_NAME"
-echo "🔗 Release: https://github.com/ScopeLift/scopelint/releases/tag/$TAG_NAME"
+echo "🔗 Tag: https://github.com/ScopeLift/scopelint/releases/tag/$TAG_NAME"
 echo ""
 echo "💡 Team members can install with:"
 echo "   ./scripts/install-beta.sh $TAG_NAME"

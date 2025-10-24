@@ -6,10 +6,10 @@ fn version_info() -> &'static str {
     if cfg!(debug_assertions) {
         return concat!(env!("CARGO_PKG_VERSION"), "-dev");
     }
-    
+
     // For release builds, check if this is a beta release
     // We'll use a build-time environment variable to set this
-    if let Some("beta") = option_env!("GIT_TAG") {
+    if option_env!("GIT_TAG") == Some("beta") {
         return concat!(env!("CARGO_PKG_VERSION"), "-beta");
     }
 

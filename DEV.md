@@ -167,7 +167,7 @@ For fast local development and testing:
 
 ```bash
 # Build and install from current source
-./scripts/dev-install.sh
+./scripts/install-dev.sh
 ```
 
 This script:
@@ -206,11 +206,11 @@ This script:
 # ... edit files ...
 
 # Test locally (fast iteration)
-./scripts/dev-install.sh
+./scripts/install-dev.sh
 
 # Test in your projects
 cd ~/my-solidity-project
-scopelint --help
+scopelint-dev --help
 ```
 
 #### 2. Create Beta Release
@@ -224,8 +224,12 @@ scopelint --help
 
 #### 3. Test Beta Release
 ```bash
-# Install the beta
-./scripts/install-beta.sh v1.0.0-beta
+# Install the beta (simple method)
+./scripts/install-beta.sh v0.0.25-beta
+
+# Test it
+scopelint --version
+# Shows: scopelint 0.0.25-beta
 
 # Test in different projects
 cd ~/project1
