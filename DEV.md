@@ -215,15 +215,11 @@ scopelint --help
 
 #### 2. Create Beta Release
 ```bash
-# Build for release with beta tag
-GIT_TAG=beta cargo build --release
+# Create beta release (one command)
+./scripts/create-beta.sh 1.0.0
 
-# Create and push tag
-git tag v1.0.0-beta
-git push origin v1.0.0-beta
-
-# Create GitHub release via CLI
-gh release create v1.0.0-beta --prerelease target/release/scopelint
+# Or with custom version
+./scripts/create-beta.sh 1.1.0
 ```
 
 #### 3. Test Beta Release
