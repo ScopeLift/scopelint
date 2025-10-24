@@ -156,3 +156,91 @@ The project uses GitHub Actions for continuous integration:
 #### Formatting Issues
 - Always run `cargo fmt` before committing
 - The project uses nightly Rust features, ensure you're on nightly toolchain
+
+## Beta Release Workflow
+
+This project includes a streamlined beta release system that allows for easy testing and iteration without affecting the main release process.
+
+### Local Development
+
+For fast local development and testing:
+
+```bash
+# Build and install from current source
+./scripts/dev-install.sh
+```
+
+This script:
+- ✅ Builds the binary from your current code
+- ✅ Installs it to `/usr/local/bin/scopelint`
+- ✅ Tests the installation
+- ✅ Works completely offline
+- ✅ Perfect for rapid iteration during development
+
+### Beta Testing
+
+For testing beta releases from GitHub:
+
+```bash
+# Install latest beta release
+./scripts/install-beta.sh
+
+# Install specific beta version
+./scripts/install-beta.sh v1.0.0-beta.1
+
+# Install to custom location
+./scripts/install-beta.sh latest ~/bin
+```
+
+This script:
+- ✅ Downloads pre-built binaries from GitHub releases
+- ✅ Installs and tests the binary
+- ✅ Works with any existing GitHub release
+- ✅ Perfect for testing published beta versions
+
+### Complete Development Workflow
+
+#### 1. Local Development
+```bash
+# Make changes to your code
+# ... edit files ...
+
+# Test locally (fast iteration)
+./scripts/dev-install.sh
+
+# Test in your projects
+cd ~/my-solidity-project
+scopelint --help
+```
+
+#### 2. Create Beta Release
+```bash
+# Build for release with beta tag
+GIT_TAG=beta cargo build --release
+
+# Create and push tag
+git tag v1.0.0-beta
+git push origin v1.0.0-beta
+
+# Create GitHub release via CLI
+gh release create v1.0.0-beta --prerelease target/release/scopelint
+```
+
+#### 3. Test Beta Release
+```bash
+# Install the beta
+./scripts/install-beta.sh v1.0.0-beta
+
+# Test in different projects
+cd ~/project1
+scopelint --help
+
+cd ~/project2
+scopelint --help
+```
+
+#### 4. Final Release
+
+If beta is good, create final release
+-  Use existing release.yml workflow
+- This publishes to crates.io automatically
