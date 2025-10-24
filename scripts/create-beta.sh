@@ -30,8 +30,8 @@ git commit -m "Prepare for beta release $TAG_NAME" || true
 
 # Step 3: Create git tag
 echo "🏷️  Creating git tag..."
-git tag $TAG_NAME
-git push origin $TAG_NAME
+git tag $TAG_NAME || echo "Tag $TAG_NAME already exists, skipping..."
+git push origin $TAG_NAME || echo "Tag $TAG_NAME already pushed, skipping..."
 
 # Step 4: Create GitHub release
 echo "📦 Creating GitHub release..."
