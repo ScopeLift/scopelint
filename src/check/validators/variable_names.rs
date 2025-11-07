@@ -11,6 +11,7 @@ use std::path::Path;
 fn is_matching_file(file: &Path) -> bool {
     file.is_file_kind(FileKind::Src) ||
         file.is_file_kind(FileKind::Test) ||
+        file.is_file_kind(FileKind::Handler) ||
         file.is_file_kind(FileKind::Script)
 }
 
@@ -231,7 +232,7 @@ mod tests {
         ";
 
         let expected_findings =
-            ExpectedFindings { src: 1, test: 1, script: 1, ..ExpectedFindings::default() };
+            ExpectedFindings { src: 1, test: 1, handler: 1, script: 1, ..ExpectedFindings::default() };
         expected_findings.assert_eq(content, &validate);
     }
 
@@ -246,7 +247,7 @@ mod tests {
         ";
 
         let expected_findings =
-            ExpectedFindings { src: 1, test: 1, script: 1, ..ExpectedFindings::default() };
+            ExpectedFindings { src: 1, test: 1, handler: 1, script: 1, ..ExpectedFindings::default() };
         expected_findings.assert_eq(content, &validate);
     }
 
@@ -261,7 +262,7 @@ mod tests {
         ";
 
         let expected_findings =
-            ExpectedFindings { src: 2, test: 2, script: 2, ..ExpectedFindings::default() };
+            ExpectedFindings { src: 2, test: 2, handler: 2, script: 2, ..ExpectedFindings::default() };
         expected_findings.assert_eq(content, &validate);
     }
 
@@ -277,7 +278,7 @@ mod tests {
         ";
 
         let expected_findings =
-            ExpectedFindings { src: 2, test: 2, script: 2, ..ExpectedFindings::default() };
+            ExpectedFindings { src: 2, test: 2, handler: 2, script: 2, ..ExpectedFindings::default() };
         expected_findings.assert_eq(content, &validate);
     }
 
@@ -292,7 +293,7 @@ mod tests {
         ";
 
         let expected_findings =
-            ExpectedFindings { src: 1, test: 1, script: 1, ..ExpectedFindings::default() };
+            ExpectedFindings { src: 1, test: 1, handler: 1, script: 1, ..ExpectedFindings::default() };
         expected_findings.assert_eq(content, &validate);
     }
 }

@@ -36,7 +36,9 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
 }
 
 fn is_matching_file(file: &Path) -> bool {
-    file.is_file_kind(FileKind::Src) || file.is_file_kind(FileKind::Test)
+    file.is_file_kind(FileKind::Src) ||
+        file.is_file_kind(FileKind::Test) ||
+        file.is_file_kind(FileKind::Handler)
 }
 
 fn validate_name(
@@ -84,7 +86,7 @@ mod tests {
             }
         ";
 
-        let expected_findings = ExpectedFindings { src: 2, test: 2, ..ExpectedFindings::default() };
+        let expected_findings = ExpectedFindings { src: 2, test: 2, handler: 2, ..ExpectedFindings::default() };
         expected_findings.assert_eq(content, &validate);
     }
 }

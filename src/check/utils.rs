@@ -109,6 +109,8 @@ pub enum FileKind {
     Src,
     /// Contracts with test methods live in the `test` directory and end with `.t.sol`.
     Test,
+    /// Contracts with handler methods live in the `test` directory and end with `.handler.sol`.
+    Handler,
 }
 
 /// Provides a method to check if a file is of a given kind.
@@ -124,6 +126,7 @@ impl IsFileKind for Path {
             FileKind::Script => path.starts_with("./script") && path.ends_with(".s.sol"),
             FileKind::Src => path.starts_with("./src") && path.ends_with(".sol"),
             FileKind::Test => path.starts_with("./test") && path.ends_with(".t.sol"),
+            FileKind::Handler => path.starts_with("./test") && path.ends_with(".handler.sol"),
         }
     }
 }
@@ -218,6 +221,8 @@ pub struct ExpectedFindings {
     pub test_helper: usize,
     /// The number of expected findings for test contracts.
     pub test: usize,
+    /// The number of expected findings for handler contracts.
+    pub handler: usize,
 }
 
 impl ExpectedFindings {
@@ -233,6 +238,7 @@ impl ExpectedFindings {
             src: expected_findings,
             test_helper: expected_findings,
             test: expected_findings,
+            handler: expected_findings,
         }
     }
 
@@ -321,6 +327,18 @@ impl ExpectedFindings {
         let invalid_items_test = validate(&to_parsed(
             "./test/MyContract.t.sol",
             src,
+            pt.clone(),
+            comments.clone(),
+            inline_config,
+            invalid_inline_config_items,
+        ));
+
+        let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
+            comments.parse_inline_config_items().partition_result();
+        let inline_config = InlineConfig::new(inline_config_items, src);
+        let invalid_items_handler = validate(&to_parsed(
+            "./test/MyContract.handler.sol",
+            src,
             pt,
             comments,
             inline_config,
@@ -333,5 +351,6 @@ impl ExpectedFindings {
         assert_eq!(invalid_items_src.len(), self.src);
         assert_eq!(invalid_items_test_helper.len(), self.test_helper);
         assert_eq!(invalid_items_test.len(), self.test);
+        assert_eq!(invalid_items_handler.len(), self.handler);
     }
 }
