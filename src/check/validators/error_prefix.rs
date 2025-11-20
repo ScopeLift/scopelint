@@ -86,7 +86,8 @@ mod tests {
             }
         ";
 
-        let expected_findings = ExpectedFindings { src: 2, test: 2, handler: 2, ..ExpectedFindings::default() };
+        let expected_findings =
+            ExpectedFindings { src: 2, test: 2, handler: 2, ..ExpectedFindings::default() };
         expected_findings.assert_eq(content, &validate);
     }
 }

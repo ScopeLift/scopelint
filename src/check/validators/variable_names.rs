@@ -231,8 +231,13 @@ mod tests {
             }
         ";
 
-        let expected_findings =
-            ExpectedFindings { src: 1, test: 1, handler: 1, script: 1, ..ExpectedFindings::default() };
+        let expected_findings = ExpectedFindings {
+            src: 1,
+            test: 1,
+            handler: 1,
+            script: 1,
+            ..ExpectedFindings::default()
+        };
         expected_findings.assert_eq(content, &validate);
     }
 
@@ -246,8 +251,13 @@ mod tests {
             }
         ";
 
-        let expected_findings =
-            ExpectedFindings { src: 1, test: 1, handler: 1, script: 1, ..ExpectedFindings::default() };
+        let expected_findings = ExpectedFindings {
+            src: 1,
+            test: 1,
+            handler: 1,
+            script: 1,
+            ..ExpectedFindings::default()
+        };
         expected_findings.assert_eq(content, &validate);
     }
 
@@ -261,8 +271,13 @@ mod tests {
             }
         ";
 
-        let expected_findings =
-            ExpectedFindings { src: 2, test: 2, handler: 2, script: 2, ..ExpectedFindings::default() };
+        let expected_findings = ExpectedFindings {
+            src: 2,
+            test: 2,
+            handler: 2,
+            script: 2,
+            ..ExpectedFindings::default()
+        };
         expected_findings.assert_eq(content, &validate);
     }
 
@@ -277,8 +292,13 @@ mod tests {
             }
         ";
 
-        let expected_findings =
-            ExpectedFindings { src: 2, test: 2, handler: 2, script: 2, ..ExpectedFindings::default() };
+        let expected_findings = ExpectedFindings {
+            src: 2,
+            test: 2,
+            handler: 2,
+            script: 2,
+            ..ExpectedFindings::default()
+        };
         expected_findings.assert_eq(content, &validate);
     }
 
@@ -292,8 +312,13 @@ mod tests {
             }
         ";
 
-        let expected_findings =
-            ExpectedFindings { src: 1, test: 1, handler: 1, script: 1, ..ExpectedFindings::default() };
+        let expected_findings = ExpectedFindings {
+            src: 1,
+            test: 1,
+            handler: 1,
+            script: 1,
+            ..ExpectedFindings::default()
+        };
         expected_findings.assert_eq(content, &validate);
     }
 }
