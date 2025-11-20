@@ -2,7 +2,7 @@ use crate::check::{
     utils::{FileKind, InvalidItem, IsFileKind, Name, ValidatorKind, VisibilitySummary},
     Parsed,
 };
-use solang_parser::pt::{ContractPart, Loc, SourceUnitPart};
+use solang_parser::pt::{ContractPart, ContractTy, Loc, SourceUnitPart};
 use std::path::Path;
 
 fn is_matching_file(file: &Path) -> bool {
@@ -24,10 +24,20 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
     let mut contract_loc: Option<Loc> = None;
 
     // Find all public methods that aren't `setUp` or `constructor`.
+    // Skip interfaces - they only declare functions, not implement them.
     let mut public_methods: Vec<String> = Vec::new();
     for element in &parsed.pt.0 {
         if let SourceUnitPart::ContractDefinition(c) = element {
-            contract_loc = Some(c.loc);
+            // Skip interfaces - they don't have implementations
+            if matches!(c.ty, ContractTy::Interface(_)) {
+                continue;
+            }
+
+            // Only set contract_loc for non-interface contracts
+            if contract_loc.is_none() {
+                contract_loc = Some(c.loc);
+            }
+
             for el in &c.parts {
                 if let ContractPart::FunctionDefinition(f) = el {
                     let name = f.name();
@@ -39,6 +49,11 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
         }
     }
 
+    // If we only found interfaces and no actual contract, we can't validate
+    let Some(loc) = contract_loc else {
+        return Vec::new();
+    };
+
     // Parse the public methods found to return a vec that's either empty if valid, or has a single
     // invalid item otherwise.
     match public_methods.len() {
@@ -46,7 +61,7 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
             vec![InvalidItem::new(
                 ValidatorKind::Script,
                 parsed,
-                contract_loc.unwrap(), //
+                loc,
                 "No `run` method found".to_string(),
             )]
         }
@@ -57,7 +72,7 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
                 vec![InvalidItem::new(
                     ValidatorKind::Script,
                     parsed,
-                    contract_loc.unwrap(), //
+                    loc,
                     "No `run` method found".to_string(),
                 )]
             }
@@ -127,5 +142,22 @@ mod tests {
         expected_findings_bad.assert_eq(content_bad0, &validate);
         expected_findings_bad.assert_eq(content_bad1, &validate);
         expected_findings_bad.assert_eq(content_bad2_variant0, &validate);
+    }
+
+    #[test]
+    fn test_script_with_interface() {
+        // Script with an interface should still pass if it has a run method
+        let content_with_interface = r"
+            interface IMultiSendCallOnly {
+                function multiSend(bytes memory transactions) external payable;
+            }
+
+            contract MyScript {
+                function run() public {}
+            }
+        ";
+
+        let expected_findings = ExpectedFindings::new(0);
+        expected_findings.assert_eq(content_with_interface, &validate);
     }
 }
