@@ -146,6 +146,7 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
             results.add_items(validators::variable_names::validate(&parsed));
             results.add_items(validators::error_prefix::validate(&parsed));
             results.add_items(validators::eip712_typehash::validate(&parsed));
+            results.add_items(validators::unused_imports::validate(&parsed));
         }
     }
     Ok(results)

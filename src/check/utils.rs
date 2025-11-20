@@ -32,6 +32,8 @@ pub enum ValidatorKind {
     Error,
     /// An EIP712 typehash validation issue.
     Eip712,
+    /// An unused import.
+    Import,
 }
 
 /// A single invalid item found by a validator.
@@ -93,6 +95,9 @@ impl InvalidItem {
             }
             ValidatorKind::Eip712 => {
                 format!("Invalid EIP712 typehash in {}: {}", self.file, self.text)
+            }
+            ValidatorKind::Import => {
+                format!("Unused import in {} on line {}: {}", self.file, self.line, self.text)
             }
         }
     }

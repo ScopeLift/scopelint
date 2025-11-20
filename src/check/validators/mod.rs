@@ -24,3 +24,6 @@ pub mod error_prefix;
 
 /// Validates that EIP712 typehashes match their corresponding struct definitions.
 pub mod eip712_typehash;
+
+/// Validates that all imported symbols are actually used in the file.
+pub mod unused_imports;
