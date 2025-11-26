@@ -180,7 +180,7 @@ scopelint-dev --help
 ./scripts/create-beta.sh 0.0.21
 
 # Install beta for testing
-./scripts/install-beta.sh v1.0.0-beta
+./scripts/install-beta.sh v0.0.21-beta
 
 # Test beta
 scopelint-beta --version
