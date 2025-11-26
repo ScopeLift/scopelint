@@ -111,6 +111,12 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
     let mut results = report::Report::default();
 
     for path in paths {
+        // Skip if the directory doesn't exist (e.g., script folder may not be created yet).
+        let path_buf = Path::new(path);
+        if !path_buf.exists() || !path_buf.is_dir() {
+            continue;
+        }
+
         for result in WalkDir::new(path) {
             let dent = match result {
                 Ok(dent) => dent,
