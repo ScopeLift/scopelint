@@ -177,10 +177,10 @@ scopelint-dev --help
 ### Beta Release
 ```bash
 # Create beta release
-./scripts/create-beta.sh v0.0.21
+./scripts/create-beta.sh 0.0.21
 
 # Install beta for testing
-./scripts/install-beta.sh v0.0.21-beta
+./scripts/install-beta.sh v1.0.0-beta
 
 # Test beta
 scopelint-beta --version
