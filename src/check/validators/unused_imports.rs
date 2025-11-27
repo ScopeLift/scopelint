@@ -88,11 +88,20 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
 
 /// Checks if a symbol is used in the source code, excluding import statements and comments.
 /// This prevents false positives where the symbol appears only in the import line or comments.
+/// However, symbols used in `@inheritdoc` `NatSpec` directives are considered as used.
 fn is_symbol_used_excluding_imports(
     source: &str,
     symbol: &str,
     import_ranges: &[(usize, usize)],
 ) -> bool {
+    // First, check if symbol is used in @inheritdoc directives (even in comments)
+    // Pattern: @inheritdoc followed by optional whitespace and the symbol name
+    let inheritdoc_pattern = format!(r"@inheritdoc\s+{}\b", regex::escape(symbol));
+    let inheritdoc_re = regex::Regex::new(&inheritdoc_pattern).unwrap();
+    if inheritdoc_re.is_match(source) {
+        return true; // Symbol is used in @inheritdoc
+    }
+
     // Create a regex pattern that matches the symbol as a whole word
     // This prevents false positives (e.g., "ERC20" matching in "ERC20Token")
     let pattern = format!(r"\b{}\b", regex::escape(symbol));
@@ -209,6 +218,48 @@ mod tests {
         "#;
 
         let expected_findings = ExpectedFindings::new(0);
+        expected_findings.assert_eq(content, &validate);
+    }
+
+    #[test]
+    fn test_inheritdoc_usage() {
+        let content = r#"
+            import {IGovernor, Governor} from "@openzeppelin/contracts/governance/Governor.sol";
+            
+            abstract contract MyGovernor is Governor {
+                /// @inheritdoc IGovernor
+                function hasVoted(uint256 proposalId, address account) public view override returns (bool) {
+                    return false;
+                }
+            }
+        "#;
+
+        let expected_findings = ExpectedFindings::new(0);
+        expected_findings.assert_eq(content, &validate);
+    }
+
+    #[test]
+    fn test_inheritdoc_with_unused_import() {
+        let content = r#"
+            import {IGovernor, Governor, IERC20} from "@openzeppelin/contracts/governance/Governor.sol";
+            
+            abstract contract MyGovernor is Governor {
+                /// @inheritdoc IGovernor
+                function hasVoted(uint256 proposalId, address account) public view override returns (bool) {
+                    return false;
+                }
+                // IERC20 is imported but never used (not even in @inheritdoc)
+            }
+        "#;
+
+        let expected_findings = ExpectedFindings {
+            script_helper: 1,
+            src: 1,
+            test_helper: 1,
+            test: 1,
+            handler: 1,
+            script: 1,
+        };
         expected_findings.assert_eq(content, &validate);
     }
 }
