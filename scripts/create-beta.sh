@@ -28,10 +28,36 @@ echo "📝 Committing changes..."
 git add .
 git commit -m "Prepare for beta release $TAG_NAME" || true
 
-# Step 3: Create git tag
+# Step 3: Create git tag (force update if it already exists)
 echo "🏷️  Creating git tag..."
-git tag $TAG_NAME || echo "Tag $TAG_NAME already exists, skipping..."
-git push origin $TAG_NAME || echo "Tag $TAG_NAME already pushed, skipping..."
+if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+    CURRENT_TAG_COMMIT=$(git rev-parse "$TAG_NAME")
+    HEAD_COMMIT=$(git rev-parse HEAD)
+    
+    echo "⚠️  Tag $TAG_NAME already exists!"
+    echo "   Current tag points to: $(git log -1 --oneline "$CURRENT_TAG_COMMIT")"
+    echo "   HEAD is at:             $(git log -1 --oneline "$HEAD_COMMIT")"
+    echo ""
+    
+    if [ "$CURRENT_TAG_COMMIT" != "$HEAD_COMMIT" ]; then
+        read -p "Do you want to update the tag to point to HEAD? (y/N): " -n 1 -r
+        echo ""
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            echo "🔄 Updating tag to current commit..."
+            git tag -f $TAG_NAME
+            git push -f origin $TAG_NAME
+        else
+            echo "❌ Tag update cancelled. Keeping existing tag."
+            exit 1
+        fi
+    else
+        echo "✅ Tag already points to HEAD, no update needed."
+        git push origin $TAG_NAME || echo "Tag already pushed, skipping..."
+    fi
+else
+    git tag $TAG_NAME
+    git push origin $TAG_NAME
+fi
 
 echo ""
 echo "✅ Beta release created successfully!"
