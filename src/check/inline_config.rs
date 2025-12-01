@@ -13,8 +13,10 @@
 // We disable clippy in this file to keep this file as close to the original as possible, so it's
 // easier to merge in upstream changes.
 #![allow(clippy::all, clippy::pedantic, clippy::cargo, clippy::nursery)]
-use crate::check::comments::{CommentState, CommentStringExt};
-use crate::check::utils::ValidatorKind;
+use crate::check::{
+    comments::{CommentState, CommentStringExt},
+    utils::ValidatorKind,
+};
 use itertools::Itertools;
 use solang_parser::pt::Loc;
 use std::{fmt, str::FromStr};
@@ -85,10 +87,7 @@ impl FromStr for InlineConfigItem {
             }
             // Check if it's just "ignore-<rule>" (defaults to next-item scope for better usability)
             if let Some(kind) = parse_rule_name(rest) {
-                return Ok(InlineConfigItem::IgnoreRule {
-                    kind,
-                    scope: RuleIgnoreScope::NextItem,
-                });
+                return Ok(InlineConfigItem::IgnoreRule { kind, scope: RuleIgnoreScope::NextItem });
             }
         }
 
@@ -126,7 +125,7 @@ pub enum RuleIgnoreScope {
     File,
 }
 
-/// Maps a rule name (e.g., "error") to a ValidatorKind
+/// Maps a rule name (e.g., "error") to a `ValidatorKind`
 fn parse_rule_name(rule: &str) -> Option<ValidatorKind> {
     match rule {
         "error" => Some(ValidatorKind::Error),
@@ -162,7 +161,13 @@ struct DisabledRange {
 
 impl DisabledRange {
     fn includes(&self, loc: Loc) -> bool {
-        loc.start() >= self.start && (if self.loose { loc.start() } else { loc.end() } <= self.end)
+        if self.loose {
+            // For loose ranges, check if location starts within the range
+            loc.start() >= self.start && loc.start() < self.end
+        } else {
+            // For strict ranges, check if entire location is within the range
+            loc.start() >= self.start && loc.end() <= self.end
+        }
     }
 }
 
@@ -178,7 +183,13 @@ struct IgnoredRange {
 
 impl IgnoredRange {
     fn includes(&self, loc: Loc) -> bool {
-        loc.start() >= self.start && (if self.loose { loc.start() } else { loc.end() } <= self.end)
+        if self.loose {
+            // For loose ranges, check if location starts within the range [start, end)
+            loc.start() >= self.start && loc.start() < self.end
+        } else {
+            // For strict ranges, check if entire location is within the range [start, end]
+            loc.start() >= self.start && loc.end() <= self.end
+        }
     }
 }
 
@@ -357,7 +368,8 @@ impl InlineConfig {
                 InlineConfigItem::IgnoreRule { kind, scope } => {
                     let kind = kind.clone();
                     let ranges = rule_ignored_ranges.entry(kind.clone()).or_insert_with(Vec::new);
-                    let range_start = rule_ignored_starts.entry(kind.clone()).or_insert_with(|| None);
+                    let range_start =
+                        rule_ignored_starts.entry(kind.clone()).or_insert_with(|| None);
                     let depth = rule_ignored_depths.entry(kind).or_insert_with(|| 0);
 
                     match scope {
@@ -372,7 +384,8 @@ impl InlineConfig {
                                 .skip_while(|(_, ch)| ch.is_whitespace());
                             if let Some((mut start, _)) = char_indices.next() {
                                 start += offset;
-                                // Find the end of the function declaration by looking for the closing brace
+                                // Find the end of the function declaration by looking for the
+                                // closing brace
                                 let mut brace_count = 0;
                                 let mut found_function_start = false;
                                 let mut end = src.len();
@@ -402,22 +415,26 @@ impl InlineConfig {
                             let end_offset = loc.end();
                             let mut next_newline =
                                 src[end_offset..].char_indices().skip_while(|(_, ch)| *ch != '\n');
-                            let end = end_offset
-                                + next_newline.next().map(|(idx, _)| idx).unwrap_or_default();
+                            let end = end_offset +
+                                next_newline.next().map(|(idx, _)| idx).unwrap_or_default();
 
                             ranges.push(IgnoredRange { start, end, loose: false });
                         }
                         RuleIgnoreScope::NextLine => {
                             let offset = loc.end();
-                            let mut char_indices =
-                                src[offset..].char_indices().skip_while(|(_, ch)| *ch != '\n').skip(1);
+                            let mut char_indices = src[offset..]
+                                .char_indices()
+                                .skip_while(|(_, ch)| *ch != '\n')
+                                .skip(1);
                             if let Some((mut start, _)) = char_indices.next() {
                                 start += offset;
                                 let end = char_indices
                                     .find(|(_, ch)| *ch == '\n')
                                     .map(|(idx, _)| offset + idx + 1)
                                     .unwrap_or(src.len());
-                                ranges.push(IgnoredRange { start, end, loose: false });
+                                // Use loose: true to include locations that might extend slightly
+                                // beyond the line
+                                ranges.push(IgnoredRange { start, end, loose: true });
                             }
                         }
                         RuleIgnoreScope::Start => {
@@ -432,7 +449,7 @@ impl InlineConfig {
                                 if let Some(start) = range_start.take() {
                                     ranges.push(IgnoredRange {
                                         start,
-                                        end: loc.start(),
+                                        end: loc.end(),
                                         loose: false,
                                     })
                                 }
@@ -441,11 +458,9 @@ impl InlineConfig {
                         RuleIgnoreScope::File => {
                             // File-level ignore: ignore from start of file to end
                             // Use loose: true to ensure any location in the file is covered
-                            ranges.push(IgnoredRange {
-                                start: 0,
-                                end: src.len(),
-                                loose: true,
-                            });
+                            // For loose ranges with < check, use src.len() + 1 to include all valid
+                            // offsets
+                            ranges.push(IgnoredRange { start: 0, end: src.len() + 1, loose: true });
                         }
                     }
                 }

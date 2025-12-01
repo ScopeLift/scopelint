@@ -48,8 +48,31 @@ This command ensures that development [best practices](https://book.getfoundry.s
 
 [More checks](https://github.com/ScopeLift/scopelint/issues/10) are planned for the future.
 
-Scopelint is opinionated in that it does not currently let you configure these checks or turn any off.
-However, if there is demand for this it may be added in a future version.
+Scopelint is opinionated in that it does not let you disable rules globally.
+However, you can ignore specific rules for specific files using:
+
+1. **Inline comments** in your Solidity files:
+   ```solidity
+   // scopelint: ignore-src-file  // Ignore 'src' rule for entire file
+   // scopelint: ignore-error-next-line  // Ignore 'error' rule for next line
+   ```
+
+2. **`.scopelint` config file** in your project root:
+   ```toml
+   # Ignore entire files
+   [ignore]
+   files = [
+       "src/legacy/old.sol",
+       "test/integration/*.sol"
+   ]
+
+   # Ignore specific rules for specific files
+   [ignore.overrides]
+   "src/BaseBridgeReceiver.sol" = ["src"]  # Only ignore 'src' rule
+   "src/legacy/**/*.sol" = ["src", "error"]  # Ignore multiple rules
+   ```
+
+   Supported rules: `error`, `import`, `variable`, `constant`, `test`, `script`, `src`, `eip712`
 
 ### `scopelint spec`
 

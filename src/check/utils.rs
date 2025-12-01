@@ -51,11 +51,15 @@ impl InvalidItem {
     #[must_use]
     /// Creates a new `InvalidItem`.
     pub fn new(kind: ValidatorKind, parsed: &Parsed, loc: Loc, text: String) -> Self {
-        let Parsed { file, src, inline_config, .. } = parsed;
+        let Parsed { file, src, inline_config, file_config, .. } = parsed;
         let line = offset_to_line(src, loc.start());
         let is_disabled = inline_config.is_disabled(loc);
-        // Check both generic ignore and rule-specific ignore
-        let is_ignored = inline_config.is_ignored(loc) || inline_config.is_rule_ignored(loc, &kind);
+        // Check both generic ignore and rule-specific ignore (from inline comments)
+        let is_ignored_inline =
+            inline_config.is_ignored(loc) || inline_config.is_rule_ignored(loc, &kind);
+        // Check if rule is ignored in file config
+        let is_ignored_file_config = file_config.get_ignored_rules(file).contains(&kind);
+        let is_ignored = is_ignored_inline || is_ignored_file_config;
         Self { kind, file: file.display().to_string(), text, line, is_disabled, is_ignored }
     }
 
@@ -254,6 +258,7 @@ impl ExpectedFindings {
     /// # Panics
     ///
     /// In practice this should not panic unless one of validations fails.
+    #[allow(clippy::too_many_lines)]
     pub fn assert_eq(&self, src: &str, validate: &dyn Fn(&Parsed) -> Vec<InvalidItem>) {
         /// Generates a `Parsed` struct from the given data.
         fn to_parsed(
@@ -271,6 +276,7 @@ impl ExpectedFindings {
                 comments,
                 inline_config,
                 invalid_inline_config_items,
+                file_config: crate::check::file_config::FileConfig::default(),
             }
         }
         // Parse content.
@@ -352,11 +358,42 @@ impl ExpectedFindings {
         ));
 
         //  Execute tests.
-        assert_eq!(invalid_items_script_helper.len(), self.script_helper);
-        assert_eq!(invalid_items_script.len(), self.script);
-        assert_eq!(invalid_items_src.len(), self.src);
-        assert_eq!(invalid_items_test_helper.len(), self.test_helper);
-        assert_eq!(invalid_items_test.len(), self.test);
-        assert_eq!(invalid_items_handler.len(), self.handler);
+        // Filter out ignored and disabled items (same as report does)
+        assert_eq!(
+            invalid_items_script_helper
+                .iter()
+                .filter(|item| !item.is_disabled && !item.is_ignored)
+                .count(),
+            self.script_helper
+        );
+        assert_eq!(
+            invalid_items_script
+                .iter()
+                .filter(|item| !item.is_disabled && !item.is_ignored)
+                .count(),
+            self.script
+        );
+        assert_eq!(
+            invalid_items_src.iter().filter(|item| !item.is_disabled && !item.is_ignored).count(),
+            self.src
+        );
+        assert_eq!(
+            invalid_items_test_helper
+                .iter()
+                .filter(|item| !item.is_disabled && !item.is_ignored)
+                .count(),
+            self.test_helper
+        );
+        assert_eq!(
+            invalid_items_test.iter().filter(|item| !item.is_disabled && !item.is_ignored).count(),
+            self.test
+        );
+        assert_eq!(
+            invalid_items_handler
+                .iter()
+                .filter(|item| !item.is_disabled && !item.is_ignored)
+                .count(),
+            self.handler
+        );
     }
 }

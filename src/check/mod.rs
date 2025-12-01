@@ -19,6 +19,9 @@ pub mod comments;
 /// Contains all the types and methods to define and parse inline config items.
 pub mod inline_config;
 
+/// Contains configuration file parser for `.scopelint` file.
+pub mod file_config;
+
 /// Contains all the types and methods to generate a report of all the invalid items found.
 pub mod report;
 
@@ -76,6 +79,8 @@ pub struct Parsed {
     pub inline_config: InlineConfig,
     /// Invalid inline config items parsed.
     pub invalid_inline_config_items: Vec<(Loc, InvalidInlineConfigItem)>,
+    /// File-level configuration from `.scopelint` file.
+    pub file_config: file_config::FileConfig,
 }
 
 /// Parses the source code and returns a [`Parsed`] struct.
@@ -95,6 +100,8 @@ pub fn parse(file: &Path) -> Result<Parsed, Box<dyn Error>> {
     let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
         comments.parse_inline_config_items().partition_result();
     let inline_config = InlineConfig::new(inline_config_items, src);
+    // File config will be set by the caller (validate function)
+    let file_config = file_config::FileConfig::default();
 
     Ok(Parsed {
         file: file.to_owned(),
@@ -103,12 +110,14 @@ pub fn parse(file: &Path) -> Result<Parsed, Box<dyn Error>> {
         comments,
         inline_config,
         invalid_inline_config_items,
+        file_config,
     })
 }
 
 // Core validation method that walks the directory and validates all Solidity files.
 fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
     let mut results = report::Report::default();
+    let file_config = file_config::FileConfig::load();
 
     for path in paths {
         // Skip if the directory doesn't exist (e.g., script folder may not be created yet).
@@ -130,8 +139,17 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
                 continue;
             }
 
+            let file_path = dent.path();
+
+            // Check if file should be ignored entirely
+            if file_config.is_file_ignored(file_path) {
+                continue;
+            }
+
             // Get the parse tree (pt) of the file and extract inline configs.
-            let parsed = parse(dent.path())?;
+            let mut parsed = parse(file_path)?;
+            // Attach file config to parsed struct
+            parsed.file_config = file_config.clone();
 
             // If there are any invalid inline config items, add them to the results.
             for invalid_item in &parsed.invalid_inline_config_items {
