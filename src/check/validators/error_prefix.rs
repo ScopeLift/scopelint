@@ -90,4 +90,55 @@ mod tests {
             ExpectedFindings { src: 2, test: 2, handler: 2, ..ExpectedFindings::default() };
         expected_findings.assert_eq(content, &validate);
     }
+
+    #[test]
+    fn test_validate_with_ignore_error_next_line() {
+        let content = r"contract MyContract {
+    // scopelint: ignore-error-next-line
+    error InvalidError();
+    
+    // This one should still be flagged
+    error AnotherInvalidError(uint256 value);
+}";
+
+        // Only one error should be found (the one without ignore directive)
+        let expected_findings =
+            ExpectedFindings { src: 1, test: 1, handler: 1, ..ExpectedFindings::default() };
+        expected_findings.assert_eq(content, &validate);
+    }
+
+    #[test]
+    fn test_validate_with_ignore_error_start_end() {
+        let content = r"contract MyContract {
+    // scopelint: ignore-error-start
+    error InvalidError();
+    error AnotherInvalidError(uint256 value);
+    // scopelint: ignore-error-end
+    
+    // This one should still be flagged
+    error YetAnotherInvalidError(uint256 value);
+}";
+
+        // Only one error should be found (outside the ignore region)
+        let expected_findings =
+            ExpectedFindings { src: 1, test: 1, handler: 1, ..ExpectedFindings::default() };
+        expected_findings.assert_eq(content, &validate);
+    }
+
+    #[test]
+    fn test_validate_with_ignore_error_file() {
+        let content = r"// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.17;
+// scopelint: ignore-error-file
+
+contract MyContract {
+    error InvalidError();
+    error AnotherInvalidError(uint256 value);
+    error YetAnotherInvalidError(uint256 value);
+}";
+
+        // All errors should be ignored for the entire file
+        let expected_findings = ExpectedFindings::new(0);
+        expected_findings.assert_eq(content, &validate);
+    }
 }

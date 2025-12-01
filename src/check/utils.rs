@@ -14,7 +14,7 @@ use std::path::Path;
 // ===============================-=======
 
 /// The type of validator that found the invalid item.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub enum ValidatorKind {
     /// A constant or immutable variable.
     Constant,
@@ -54,7 +54,8 @@ impl InvalidItem {
         let Parsed { file, src, inline_config, .. } = parsed;
         let line = offset_to_line(src, loc.start());
         let is_disabled = inline_config.is_disabled(loc);
-        let is_ignored = inline_config.is_ignored(loc);
+        // Check both generic ignore and rule-specific ignore
+        let is_ignored = inline_config.is_ignored(loc) || inline_config.is_rule_ignored(loc, &kind);
         Self { kind, file: file.display().to_string(), text, line, is_disabled, is_ignored }
     }
 
