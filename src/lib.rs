@@ -10,6 +10,9 @@ pub mod check;
 /// Parses library configuration.
 pub mod config;
 
+/// Parses Solidity source files.
+pub mod parser;
+
 /// Formats Solidity and TOML files.
 pub mod fmt;
 
