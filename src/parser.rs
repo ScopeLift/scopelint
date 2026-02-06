@@ -9,7 +9,8 @@ static TRANSIENT_KEYWORD: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\btransient\b").expect("transient regex is valid"));
 const TRANSIENT_REPLACEMENT: &str = "         ";
 
-/// Parses Solidity source code, with a fallback that strips unsupported keywords (e.g. `transient`).
+/// Parses Solidity source code, with a fallback that strips unsupported keywords (e.g.
+/// `transient`).
 ///
 /// This keeps byte offsets stable by replacing keywords with same-length whitespace, so
 /// comment and inline-config locations remain aligned with the original source.
@@ -27,7 +28,7 @@ pub fn parse_solidity(
         Err(errs) => {
             let sanitized = sanitize(src);
             if sanitized == src {
-                return Err(errs)
+                return Err(errs);
             }
             solang_parser::parse(&sanitized, file_no).map_or(Err(errs), Ok)
         }
@@ -41,12 +42,10 @@ fn sanitize(src: &str) -> String {
 
 fn strip_transient(src: &str) -> String {
     if !src.contains("transient") {
-        return src.to_string()
+        return src.to_string();
     }
 
-    TRANSIENT_KEYWORD
-        .replace_all(src, TRANSIENT_REPLACEMENT)
-        .into_owned()
+    TRANSIENT_KEYWORD.replace_all(src, TRANSIENT_REPLACEMENT).into_owned()
 }
 
 #[cfg(test)]

@@ -230,8 +230,7 @@ fn get_contracts_for_dir<P: AsRef<Path>>(
 
 fn parse_contracts(file: &Path, show_internal: bool) -> Vec<ParsedContract> {
     let content = fs::read_to_string(file).unwrap();
-    let (pt, _comments) =
-        crate::parser::parse_solidity(&content, 0).expect("Parsing failed");
+    let (pt, _comments) = crate::parser::parse_solidity(&content, 0).expect("Parsing failed");
     let mut contracts: Vec<ParsedContract> = Vec::new();
 
     for element in &pt.0 {

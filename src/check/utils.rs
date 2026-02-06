@@ -280,8 +280,7 @@ impl ExpectedFindings {
             }
         }
         // Parse content.
-        let (pt, comments) =
-            crate::parser::parse_solidity(src, 0).expect("Parsing failed");
+        let (pt, comments) = crate::parser::parse_solidity(src, 0).expect("Parsing failed");
         let comments = Comments::new(comments, src);
 
         // Create `Parsed` struct for each file path to test. We can clone `pt` and `comments`, but
