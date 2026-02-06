@@ -7,7 +7,7 @@
   license = "MIT"
   name = "scopelint"
   repository = "https://github.com/ScopeLift/scopelint"
-  version = "0.0.22"
+  version = "0.0.21"
 
 [dependencies]
   clap = { version = "4.4.2", features = ["derive"] }
@@ -18,9 +18,5 @@
   regex = "1.6.0"
   solang-parser = "0.3.2"
   taplo = "0.13.0"
-<<<<<<< HEAD
   toml = "0.8"
   walkdir = "2.3.2"
-=======
-  walkdir = "2.3.2"
->>>>>>> b1339a2 (Support transient storage)
