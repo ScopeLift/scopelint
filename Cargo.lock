@@ -790,7 +790,6 @@ dependencies = [
  "colored",
  "globset",
  "itertools 0.11.0",
- "once_cell",
  "regex",
  "solang-parser",
  "taplo",

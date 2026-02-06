@@ -1,12 +1,12 @@
-use once_cell::sync::Lazy;
 use regex::Regex;
 use solang_parser::{
     diagnostics::Diagnostic,
     pt::{Comment, SourceUnit},
 };
+use std::sync::LazyLock;
 
-static TRANSIENT_KEYWORD: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\btransient\b").expect("transient regex is valid"));
+static TRANSIENT_KEYWORD: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\btransient\b").expect("transient regex is valid"));
 const TRANSIENT_REPLACEMENT: &str = "         ";
 
 /// Parses Solidity source code, with a fallback that strips unsupported keywords (e.g. `transient`).
@@ -14,6 +14,10 @@ const TRANSIENT_REPLACEMENT: &str = "         ";
 /// This keeps byte offsets stable by replacing keywords with same-length whitespace, so
 /// comment and inline-config locations remain aligned with the original source.
 /// To add more preprocessing, extend `sanitize()`.
+///
+/// # Errors
+///
+/// Returns the parser diagnostics when the source cannot be parsed (even after preprocessing).
 pub fn parse_solidity(
     src: &str,
     file_no: usize,
@@ -25,10 +29,7 @@ pub fn parse_solidity(
             if sanitized == src {
                 return Err(errs)
             }
-            match solang_parser::parse(&sanitized, file_no) {
-                Ok(result) => Ok(result),
-                Err(_) => Err(errs),
-            }
+            solang_parser::parse(&sanitized, file_no).map_or(Err(errs), Ok)
         }
     }
 }
@@ -55,11 +56,11 @@ mod tests {
 
     #[test]
     fn test_parse_with_transient() {
-        let src = r#"
+        let src = r"
 contract C {
     uint128 transient b;
 }
-"#;
+";
         let result = parse_solidity(src, 0);
         assert!(
             result.is_ok(),
