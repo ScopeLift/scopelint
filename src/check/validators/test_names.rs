@@ -4,21 +4,21 @@ use crate::check::{
 };
 use regex::Regex;
 use solang_parser::pt::{ContractPart, FunctionDefinition, SourceUnitPart};
-use std::{path::Path, sync::LazyLock};
+use std::sync::LazyLock;
 
 // A regex matching valid test names, see the `validate_test_names_regex` test for examples.
 static RE_VALID_TEST_NAME: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^test(Fork)?(Fuzz)?(_Revert(If|When|On|Given))?_(\w+)*$").unwrap()
 });
 
-fn is_matching_file(file: &Path) -> bool {
-    file.is_file_kind(FileKind::Test)
+fn is_matching_file(parsed: &Parsed) -> bool {
+    parsed.file.is_file_kind(FileKind::Test, &parsed.path_config)
 }
 
 #[must_use]
 /// Validates that test names are in the correct format.
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
-    if !is_matching_file(&parsed.file) {
+    if !is_matching_file(parsed) {
         return Vec::new();
     }
 

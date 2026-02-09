@@ -5,12 +5,10 @@ use crate::check::{
     utils::{FileKind, InvalidItem, IsFileKind, ValidatorKind},
     Parsed,
 };
-use std::path::Path;
-
 #[must_use]
 // Validates that EIP712 typehash parameter counts match their usage in abi.encode calls.
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
-    if !is_matching_file(&parsed.file) {
+    if !is_matching_file(parsed) {
         return Vec::new();
     }
 
@@ -66,8 +64,8 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
     invalid_items
 }
 
-fn is_matching_file(file: &Path) -> bool {
-    file.is_file_kind(FileKind::Src)
+fn is_matching_file(parsed: &Parsed) -> bool {
+    parsed.file.is_file_kind(FileKind::Src, &parsed.path_config)
 }
 
 fn extract_typehash_variable(

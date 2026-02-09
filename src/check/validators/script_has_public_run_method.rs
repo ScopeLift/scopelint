@@ -3,10 +3,8 @@ use crate::check::{
     Parsed,
 };
 use solang_parser::pt::{ContractPart, ContractTy, Loc, SourceUnitPart};
-use std::path::Path;
-
-fn is_matching_file(file: &Path) -> bool {
-    file.is_file_kind(FileKind::Script)
+fn is_matching_file(parsed: &Parsed) -> bool {
+    parsed.file.is_file_kind(FileKind::Script, &parsed.path_config)
 }
 
 #[must_use]
@@ -16,7 +14,7 @@ fn is_matching_file(file: &Path) -> bool {
 ///
 /// Panics if the script has no contract definition.
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
-    if !is_matching_file(&parsed.file) {
+    if !is_matching_file(parsed) {
         return Vec::new();
     }
 

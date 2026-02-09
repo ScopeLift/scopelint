@@ -4,6 +4,7 @@
 #![allow(clippy::case_sensitive_file_extension_comparisons)]
 
 use super::Parsed;
+use crate::foundry_config::CheckPaths;
 use solang_parser::pt::{
     FunctionAttribute, FunctionDefinition, FunctionTy, Loc, SourceUnit, Visibility,
 };
@@ -126,17 +127,17 @@ pub enum FileKind {
 /// Provides a method to check if a file is of a given kind.
 pub trait IsFileKind {
     /// Returns `true` if the file is of the given kind, `false` otherwise.
-    fn is_file_kind(&self, kind: FileKind) -> bool;
+    fn is_file_kind(&self, kind: FileKind, paths: &CheckPaths) -> bool;
 }
 
 impl IsFileKind for Path {
-    fn is_file_kind(&self, kind: FileKind) -> bool {
+    fn is_file_kind(&self, kind: FileKind, paths: &CheckPaths) -> bool {
         let path = self.to_str().unwrap();
         match kind {
-            FileKind::Script => path.starts_with("./script") && path.ends_with(".s.sol"),
-            FileKind::Src => path.starts_with("./src") && path.ends_with(".sol"),
-            FileKind::Test => path.starts_with("./test") && path.ends_with(".t.sol"),
-            FileKind::Handler => path.starts_with("./test") && path.ends_with(".handler.sol"),
+            FileKind::Script => path.starts_with(paths.script_path.as_str()) && path.ends_with(".s.sol"),
+            FileKind::Src => path.starts_with(paths.src_path.as_str()) && path.ends_with(".sol"),
+            FileKind::Test => path.starts_with(paths.test_path.as_str()) && path.ends_with(".t.sol"),
+            FileKind::Handler => path.starts_with(paths.test_path.as_str()) && path.ends_with(".handler.sol"),
         }
     }
 }
@@ -277,6 +278,7 @@ impl ExpectedFindings {
                 inline_config,
                 invalid_inline_config_items,
                 file_config: crate::check::file_config::FileConfig::default(),
+                path_config: CheckPaths::default(),
             }
         }
         // Parse content.

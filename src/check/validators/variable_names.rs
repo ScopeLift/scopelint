@@ -6,13 +6,12 @@ use solang_parser::pt::{
     ContractPart, FunctionDefinition, Parameter, SourceUnitPart, Statement, VariableDeclaration,
     VariableDefinition,
 };
-use std::path::Path;
-
-fn is_matching_file(file: &Path) -> bool {
-    file.is_file_kind(FileKind::Src) ||
-        file.is_file_kind(FileKind::Test) ||
-        file.is_file_kind(FileKind::Handler) ||
-        file.is_file_kind(FileKind::Script)
+fn is_matching_file(parsed: &Parsed) -> bool {
+    let file = &parsed.file;
+    file.is_file_kind(FileKind::Src, &parsed.path_config)
+        || file.is_file_kind(FileKind::Test, &parsed.path_config)
+        || file.is_file_kind(FileKind::Handler, &parsed.path_config)
+        || file.is_file_kind(FileKind::Script, &parsed.path_config)
 }
 
 #[must_use]
@@ -21,7 +20,7 @@ fn is_matching_file(file: &Path) -> bool {
 /// - Non-storage variables (local variables, parameters) should have an underscore prefix
 /// - Variables that reference storage/storages should NOT have an underscore prefix
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
-    if !is_matching_file(&parsed.file) {
+    if !is_matching_file(parsed) {
         return Vec::new();
     }
 

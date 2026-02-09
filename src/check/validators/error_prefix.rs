@@ -4,12 +4,10 @@ use crate::check::{
     utils::{FileKind, InvalidItem, IsFileKind, ValidatorKind},
     Parsed,
 };
-use std::path::Path;
-
 #[must_use]
 /// Validates that error names are prefixed with `ContractName_`
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
-    if !is_matching_file(&parsed.file) {
+    if !is_matching_file(parsed) {
         return Vec::new();
     }
 
@@ -35,10 +33,11 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
     invalid_items
 }
 
-fn is_matching_file(file: &Path) -> bool {
-    file.is_file_kind(FileKind::Src) ||
-        file.is_file_kind(FileKind::Test) ||
-        file.is_file_kind(FileKind::Handler)
+fn is_matching_file(parsed: &Parsed) -> bool {
+    let file = &parsed.file;
+    file.is_file_kind(FileKind::Src, &parsed.path_config)
+        || file.is_file_kind(FileKind::Test, &parsed.path_config)
+        || file.is_file_kind(FileKind::Handler, &parsed.path_config)
 }
 
 fn validate_name(

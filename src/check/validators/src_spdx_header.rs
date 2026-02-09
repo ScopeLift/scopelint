@@ -2,17 +2,15 @@ use crate::check::{
     utils::{FileKind, InvalidItem, IsFileKind, ValidatorKind},
     Parsed,
 };
-use std::path::Path;
-
 /// Check if a file is a source file
-fn is_matching_file(file: &Path) -> bool {
-    file.is_file_kind(FileKind::Src)
+fn is_matching_file(parsed: &Parsed) -> bool {
+    parsed.file.is_file_kind(FileKind::Src, &parsed.path_config)
 }
 
 #[must_use]
 /// Validates that source files have SPDX license headers.
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
-    if !is_matching_file(&parsed.file) {
+    if !is_matching_file(parsed) {
         return Vec::new();
     }
 

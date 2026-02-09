@@ -3,16 +3,15 @@ use crate::check::{
     Parsed,
 };
 use solang_parser::pt::{ContractPart, ContractTy, FunctionDefinition, SourceUnitPart};
-use std::path::Path;
 
-fn is_matching_file(file: &Path) -> bool {
-    file.is_file_kind(FileKind::Src)
+fn is_matching_file(parsed: &Parsed) -> bool {
+    parsed.file.is_file_kind(FileKind::Src, &parsed.path_config)
 }
 
 #[must_use]
 /// Validates that internal and private function names are prefixed with an underscore.
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
-    if !is_matching_file(&parsed.file) {
+    if !is_matching_file(parsed) {
         return Vec::new();
     }
 

@@ -86,3 +86,20 @@ fn test_check_proj2_no_findings() {
     }
     assert_eq!(findings.len(), expected_findings.len());
 }
+
+/// Projects with contracts/ instead of src/ must not hit "No such file or directory" for ./src.
+/// This project has [profile.default] src = "contracts" and no src/ directory.
+#[test]
+fn test_check_proj3_contracts_layout_no_io_error() {
+    let output = run_scopelint("check-proj3-ContractsLayout");
+    let stderr = String::from_utf8(output.stderr).unwrap();
+
+    assert!(
+        !stderr.contains("No such file or directory"),
+        "scopelint check must not require ./src when foundry.toml uses src = \"contracts\"; stderr:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("operation on ./src"),
+        "scopelint check must not reference ./src when using contracts/; stderr:\n{stderr}"
+    );
+}

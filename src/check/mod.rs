@@ -2,6 +2,7 @@ use crate::check::{
     comments::Comments,
     inline_config::{InlineConfig, InvalidInlineConfigItem},
 };
+use crate::foundry_config::CheckPaths;
 use colored::Colorize;
 use itertools::Itertools;
 use solang_parser::pt::{Loc, SourceUnit};
@@ -53,8 +54,8 @@ pub fn run(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> 
 // =============================
 
 fn validate_conventions() -> Result<(), Box<dyn Error>> {
-    let paths = ["./src", "./script", "./test"];
-    let results = validate(paths)?;
+    let path_config = CheckPaths::load();
+    let results = validate(&path_config)?;
 
     if !results.is_valid() {
         eprint!("{results}");
@@ -81,6 +82,8 @@ pub struct Parsed {
     pub invalid_inline_config_items: Vec<(Loc, InvalidInlineConfigItem)>,
     /// File-level configuration from `.scopelint` file.
     pub file_config: file_config::FileConfig,
+    /// Path configuration from foundry.toml (src/script/test dirs).
+    pub path_config: CheckPaths,
 }
 
 /// Parses the source code and returns a [`Parsed`] struct.
@@ -100,8 +103,9 @@ pub fn parse(file: &Path) -> Result<Parsed, Box<dyn Error>> {
     let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
         comments.parse_inline_config_items().partition_result();
     let inline_config = InlineConfig::new(inline_config_items, src);
-    // File config will be set by the caller (validate function)
+    // File config and path config will be set by the caller (validate function)
     let file_config = file_config::FileConfig::default();
+    let path_config = CheckPaths::default();
 
     Ok(Parsed {
         file: file.to_owned(),
@@ -111,15 +115,16 @@ pub fn parse(file: &Path) -> Result<Parsed, Box<dyn Error>> {
         inline_config,
         invalid_inline_config_items,
         file_config,
+        path_config,
     })
 }
 
 // Core validation method that walks the directory and validates all Solidity files.
-fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
+fn validate(path_config: &CheckPaths) -> Result<report::Report, Box<dyn Error>> {
     let mut results = report::Report::default();
     let file_config = file_config::FileConfig::load();
 
-    for path in paths {
+    for path in path_config.as_array() {
         // Skip if the directory doesn't exist (e.g., script folder may not be created yet).
         let path_buf = Path::new(path);
         if !path_buf.exists() || !path_buf.is_dir() {
@@ -148,8 +153,9 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
 
             // Get the parse tree (pt) of the file and extract inline configs.
             let mut parsed = parse(file_path)?;
-            // Attach file config to parsed struct
+            // Attach file config and path config to parsed struct
             parsed.file_config = file_config.clone();
+            parsed.path_config = path_config.clone();
 
             // If there are any invalid inline config items, add them to the results.
             for invalid_item in &parsed.invalid_inline_config_items {

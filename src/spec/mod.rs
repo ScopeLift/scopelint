@@ -4,6 +4,7 @@
 #![allow(clippy::case_sensitive_file_extension_comparisons)]
 
 use crate::check::utils::{Name, VisibilitySummary};
+use crate::foundry_config::CheckPaths;
 use colored::Colorize;
 use solang_parser::pt::{
     ContractDefinition, ContractPart, ContractTy, FunctionDefinition, SourceUnitPart,
@@ -27,8 +28,9 @@ pub fn run(show_internal: bool) -> Result<(), Box<dyn Error>> {
 
     // First, parse all source and test files to collect the contracts and their methods. All free
     // functions are added under a special contract called `FreeFunctions`.
-    let src_contracts = get_contracts_for_dir("./src", ".sol", show_internal);
-    let test_contracts = get_contracts_for_dir("./test", ".t.sol", show_internal);
+    let path_config = CheckPaths::load();
+    let src_contracts = get_contracts_for_dir(&path_config.src_path, ".sol", show_internal);
+    let test_contracts = get_contracts_for_dir(&path_config.test_path, ".t.sol", show_internal);
 
     // ========================================
     // ======== Generate Specification ========

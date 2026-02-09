@@ -10,6 +10,9 @@ pub mod check;
 /// Parses library configuration.
 pub mod config;
 
+/// Path configuration from foundry.toml.
+pub mod foundry_config;
+
 /// Parses Solidity source files.
 pub mod parser;
 

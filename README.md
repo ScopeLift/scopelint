@@ -44,7 +44,27 @@ This command ensures that development [best practices](https://book.getfoundry.s
 - Test names follow a convention of `^test(Fork)?(Fuzz)?(_Revert(If|When|On))?_(\w+)*$`. (To see a list of example valid test names, see [here](https://github.com/ScopeLift/scopelint/blob/1857e3940bfe92ac5a136827374f4b27ff083971/src/check/validators/test_names.rs#L106-L127)).
 - Constants and immutables are in `ALL_CAPS`.
 - Function names and visibility in forge scripts only have 1 public `run` method per script.
-- Internal or private functions in the `src/` directory start with a leading underscore.
+- Internal or private functions in the source directory start with a leading underscore.
+
+**Path configuration:** `scopelint check` (and `scopelint spec`) use your existing Foundry paths so they work with non-default layouts (e.g. `contracts/` instead of `src/`). Paths are read from `foundry.toml` in the same way as Forge:
+
+- If present, `[profile.default]` (or root-level) `src`, `test`, and `script` are used.
+- You can override them for scopelint only with an optional `[check]` section:
+
+  ```toml
+  [profile.default]
+  src = "contracts"
+  test = "test"
+  script = "script"
+
+  # Optional: scopelint-specific path overrides (defaults to profile.default if omitted)
+  [check]
+  src_path = "./contracts"
+  script_path = "./script"
+  test_path = "./test"
+  ```
+
+  If `[check]` is omitted, Foundry’s paths are used as-is, so no re-definition is required.
 
 [More checks](https://github.com/ScopeLift/scopelint/issues/10) are planned for the future.
 
