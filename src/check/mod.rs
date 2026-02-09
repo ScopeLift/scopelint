@@ -9,6 +9,7 @@ use colored::Colorize;
 use itertools::Itertools;
 use solang_parser::pt::{Loc, SourceUnit};
 use std::{
+    collections::HashSet,
     error::Error,
     ffi::OsStr,
     fs,
@@ -49,6 +50,90 @@ pub fn run(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> 
     } else {
         Err("One or more checks failed, review above output".into())
     }
+}
+
+/// Applies safe fixes (e.g. remove unused imports), then runs check.
+///
+/// # Errors
+///
+/// Returns an error if fixes could not be applied or if convention checks still fail after
+/// fixing.
+pub fn run_fix(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
+    let path_config = CheckPaths::load();
+    let results = validate(&path_config)?;
+
+    let fixable_imports: Vec<&utils::InvalidItem> = results
+        .items()
+        .iter()
+        .filter(|item| {
+            item.kind == utils::ValidatorKind::Import && !item.is_disabled && !item.is_ignored
+        })
+        .collect();
+
+    if fixable_imports.is_empty() {
+        // No fixable import issues; run normal check and return its result.
+        let valid_names = validate_conventions();
+        let valid_fmt = validators::formatting::validate(taplo_opts);
+        if valid_names.is_ok() && valid_fmt.is_ok() {
+            return Ok(());
+        }
+        return Err("One or more checks failed, review above output".into());
+    }
+
+    let file_config = file_config::FileConfig::load();
+
+    // Group fixable import items by file and collect symbol names to remove.
+    let by_file: std::collections::HashMap<&str, HashSet<String>> = fixable_imports
+        .iter()
+        .map(|item| {
+            let symbol = extract_unused_import_symbol(&item.text);
+            (item.file.as_str(), symbol)
+        })
+        .fold(std::collections::HashMap::new(), |mut acc, (file, symbol)| {
+            acc.entry(file).or_default().insert(symbol);
+            acc
+        });
+
+    let mut fixed_count = 0_usize;
+    for (file_path, symbols) in &by_file {
+        let path = Path::new(file_path);
+        if !path.exists() {
+            continue;
+        }
+        let mut parsed = parse(path)?;
+        parsed.file_config = file_config.clone();
+        parsed.path_config = path_config.clone();
+
+        if let Some(new_src) = validators::unused_imports::fix_source(&parsed, Some(symbols)) {
+            fs::write(path, new_src)?;
+            fixed_count += 1;
+        }
+    }
+
+    if fixed_count > 0 {
+        eprintln!("{}: Fixed unused imports in {} file(s)", "info".bold().green(), fixed_count);
+    }
+
+    // Re-run check and report any remaining issues.
+    let valid_names = validate_conventions();
+    let valid_fmt = validators::formatting::validate(taplo_opts);
+    if valid_names.is_ok() && valid_fmt.is_ok() {
+        Ok(())
+    } else {
+        Err("One or more checks failed, review above output".into())
+    }
+}
+
+/// Extracts the symbol name from an "Unused import: '`SymbolName`'" message.
+fn extract_unused_import_symbol(text: &str) -> String {
+    const PREFIX: &str = "Unused import: '";
+    const SUFFIX: char = '\'';
+    if let Some(stripped) = text.strip_prefix(PREFIX) {
+        if let Some(symbol) = stripped.strip_suffix(SUFFIX) {
+            return symbol.to_string();
+        }
+    }
+    text.to_string()
 }
 
 // =============================

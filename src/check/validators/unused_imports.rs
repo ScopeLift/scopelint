@@ -3,11 +3,15 @@ use crate::check::{
     Parsed,
 };
 use regex::Regex;
-use std::sync::LazyLock;
+use std::{collections::HashSet, sync::LazyLock};
 
 // Regex to match import statements with symbol lists: `import {Symbol1, Symbol2} from "...";`
 static RE_IMPORT_SYMBOL_LIST: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"import\s*\{([^}]+)\}\s+from\s+"[^"]+";"#).unwrap());
+
+// Same but with path captured for fix_source (reconstructing the statement).
+static RE_IMPORT_SYMBOL_LIST_WITH_PATH: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"import\s*\{([^}]+)\}\s+from\s+"([^"]+)";"#).unwrap());
 
 // Regex to match aliased imports: `import "..." as Alias;`
 static RE_IMPORT_ALIAS: LazyLock<Regex> =
@@ -141,10 +145,96 @@ fn is_symbol_used_excluding_imports(
     false
 }
 
+/// Returns the source with unused imports removed, or `None` if no changes.
+///
+/// - `only_remove`: if `Some(set)`, only remove symbols in the set (e.g. fixable from report). If
+///   `None`, remove all unused imports.
+///
+/// # Panics
+///
+/// Panics if a regex capture group is missing (should not happen with the current patterns).
+#[must_use]
+#[allow(clippy::implicit_hasher)]
+pub fn fix_source(parsed: &Parsed, only_remove: Option<&HashSet<String>>) -> Option<String> {
+    let mut import_ranges: Vec<(usize, usize)> = Vec::new();
+    for cap in RE_IMPORT_SYMBOL_LIST_WITH_PATH.captures_iter(&parsed.src) {
+        let m = cap.get(0).expect("capture 0 always present");
+        import_ranges.push((m.start(), m.end()));
+    }
+    for cap in RE_IMPORT_ALIAS.captures_iter(&parsed.src) {
+        let m = cap.get(0).expect("capture 0 always present");
+        import_ranges.push((m.start(), m.end()));
+    }
+
+    let mut edits: Vec<(usize, usize, String)> = Vec::new();
+
+    // Named imports: `import { A, B } from "path";`
+    for cap in RE_IMPORT_SYMBOL_LIST_WITH_PATH.captures_iter(&parsed.src) {
+        let m = cap.get(0).expect("capture 0 always present");
+        let start = m.start();
+        let end = m.end();
+        let symbols_str = cap.get(1).expect("capture 1 always present").as_str();
+        let path = cap.get(2).expect("capture 2 always present").as_str();
+
+        let mut kept: Vec<&str> = Vec::new();
+        for symbol_part in symbols_str.split(',') {
+            let symbol_part = symbol_part.trim();
+            let name =
+                symbol_part.split_once(" as ").map_or(symbol_part, |(_, alias)| alias.trim());
+            let should_remove = only_remove.map_or_else(
+                || !is_symbol_used_excluding_imports(&parsed.src, name, &import_ranges),
+                |set| set.contains(name),
+            );
+            if !should_remove {
+                kept.push(symbol_part);
+            }
+        }
+
+        if kept.is_empty() {
+            edits.push((start, end, String::new()));
+        } else if kept.len() < symbol_part_count(symbols_str) {
+            let new_list = kept.join(", ");
+            edits.push((start, end, format!(r#"import {{ {new_list} }} from "{path}";"#)));
+        }
+    }
+
+    // Aliased imports: `import "..." as Alias;`
+    for cap in RE_IMPORT_ALIAS.captures_iter(&parsed.src) {
+        let m = cap.get(0).expect("capture 0 always present");
+        let start = m.start();
+        let end = m.end();
+        let alias = cap.get(1).expect("capture 1 always present").as_str();
+        let should_remove = only_remove.map_or_else(
+            || !is_symbol_used_excluding_imports(&parsed.src, alias, &import_ranges),
+            |set| set.contains(alias),
+        );
+        if should_remove {
+            edits.push((start, end, String::new()));
+        }
+    }
+
+    if edits.is_empty() {
+        return None;
+    }
+
+    // Apply from end to start so offsets stay valid.
+    edits.sort_by_key(|(s, _e, _r)| std::cmp::Reverse(*s));
+    let mut out = parsed.src.clone();
+    for (start, end, replacement) in edits {
+        out = format!("{}{}{}", &out[..start], replacement, &out[end..]);
+    }
+    Some(out)
+}
+
+fn symbol_part_count(symbols_str: &str) -> usize {
+    symbols_str.split(',').filter(|s| !s.trim().is_empty()).count()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::check::utils::ExpectedFindings;
+    use itertools::Itertools;
 
     #[test]
     fn test_no_unused_imports() {
@@ -261,5 +351,71 @@ mod tests {
             script: 1,
         };
         expected_findings.assert_eq(content, &validate);
+    }
+
+    fn parsed_from_src(content: &str) -> crate::check::Parsed {
+        use crate::check::{comments::Comments, inline_config::InlineConfig};
+        use std::path::PathBuf;
+
+        let (pt, comments) = crate::parser::parse_solidity(content, 0).expect("parse");
+        let comments = Comments::new(comments, content);
+        let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
+            comments.parse_inline_config_items().partition_result();
+        let inline_config = InlineConfig::new(inline_config_items, content);
+        crate::check::Parsed {
+            file: PathBuf::from("./src/Contract.sol"),
+            src: content.to_string(),
+            pt,
+            comments,
+            inline_config,
+            invalid_inline_config_items,
+            file_config: crate::check::file_config::FileConfig::default(),
+            path_config: crate::foundry_config::CheckPaths::default(),
+        }
+    }
+
+    #[test]
+    fn test_fix_source_removes_unused_from_named_import() {
+        let content = r#"import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+contract MyContract {
+    ERC20 public token;
+}
+"#;
+        let parsed = parsed_from_src(content);
+        let fixed = fix_source(&parsed, None).unwrap();
+        assert!(
+            fixed.contains(
+                r#"import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";"#
+            ),
+            "expected single used symbol in import, got: {fixed:?}"
+        );
+        assert!(!fixed.contains("IERC20"));
+    }
+
+    #[test]
+    fn test_fix_source_removes_whole_aliased_import() {
+        let content = r#"import "@openzeppelin/contracts/token/ERC20/ERC20.sol" as OZERC20;
+
+contract MyContract {
+}
+"#;
+        let parsed = parsed_from_src(content);
+        let fixed = fix_source(&parsed, None).unwrap();
+        assert!(!fixed.contains("OZERC20"));
+        assert!(!fixed.contains("as OZERC20"));
+    }
+
+    #[test]
+    fn test_fix_source_no_change_when_all_used() {
+        let content = r#"import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+contract MyContract {
+    ERC20 public token;
+}
+"#;
+        let parsed = parsed_from_src(content);
+        let fixed = fix_source(&parsed, None);
+        assert!(fixed.is_none());
     }
 }

@@ -1,0 +1,3 @@
+[fmt]
+  bracket_spacing = false
+  line_length = 100

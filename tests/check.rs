@@ -18,6 +18,18 @@ fn run_scopelint(test_folder: &str) -> Output {
         .expect("Failed to execute command")
 }
 
+fn run_scopelint_fix(test_folder: &str) -> Output {
+    let cwd = env::current_dir().unwrap();
+    let project_path = cwd.join("tests").join(test_folder);
+    let binary_path = cwd.join("target/debug/scopelint");
+
+    Command::new(binary_path)
+        .current_dir(project_path)
+        .arg("fix")
+        .output()
+        .expect("Failed to execute command")
+}
+
 #[test]
 fn test_check_proj1_all_findings() {
     let output = run_scopelint("check-proj1-AllFindings");
@@ -101,5 +113,25 @@ fn test_check_proj3_contracts_layout_no_io_error() {
     assert!(
         !stderr.contains("operation on ./src"),
         "scopelint check must not reference ./src when using contracts/; stderr:\n{stderr}"
+    );
+}
+
+/// Running `scopelint fix` removes unused imports; the fixed file no longer contains the unused
+/// symbol.
+#[test]
+fn test_fix_removes_unused_import() {
+    use std::fs;
+
+    let cwd = env::current_dir().unwrap();
+    let project_path = cwd.join("tests").join("fix-proj1");
+    let token_sol = project_path.join("src").join("Token.sol");
+
+    let _ = run_scopelint_fix("fix-proj1");
+
+    let content = fs::read_to_string(&token_sol).expect("read Token.sol");
+    assert!(content.contains("ERC20"), "Fixed file should still import ERC20");
+    assert!(
+        !content.contains("IERC20"),
+        "Fixed file should not contain unused import IERC20; content:\n{content}"
     );
 }

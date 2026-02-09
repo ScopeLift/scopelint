@@ -39,6 +39,9 @@ pub enum Subcommands {
         /// Show changes without modifying files.
         check: bool,
     },
+    #[clap(about = "Applies safe fixes (e.g. remove unused imports), then runs check.")]
+    /// Applies safe fixes (e.g. remove unused imports), then runs check.
+    Fix,
     #[clap(about = "Generates a specification for the current project from test names.")]
     /// Generates a specification for the current project from test names.
     Spec {

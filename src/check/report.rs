@@ -30,6 +30,12 @@ impl Report {
         self.invalid_items.extend(items);
     }
 
+    /// Returns all invalid items (including ignored/disabled).
+    #[must_use]
+    pub fn items(&self) -> &[InvalidItem] {
+        &self.invalid_items
+    }
+
     /// Returns true if no issues were found.
     #[must_use]
     pub fn is_valid(&self) -> bool {

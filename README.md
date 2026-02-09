@@ -7,6 +7,7 @@ A simple and opinionated tool designed for basic formatting/linting of Solidity 
   - [Usage](#usage)
     - [`scopelint fmt`](#scopelint-fmt)
     - [`scopelint check`](#scopelint-check)
+    - [`scopelint fix`](#scopelint-fix)
     - [`scopelint spec`](#scopelint-spec)
   - [Development](#development)
 
@@ -19,10 +20,11 @@ When using the [ScopeLift Foundry template](https://github.com/ScopeLift/foundry
 
 ## Usage
 
-Once installed there are three commands:
+Once installed there are four commands:
 
 - `scopelint fmt`
 - `scopelint check`
+- `scopelint fix`
 - `scopelint spec`
 
 For all commands, please open issues for any bug reports, suggestions, or feature requests.
@@ -93,6 +95,14 @@ However, you can ignore specific rules for specific files using:
    ```
 
    Supported rules: `error`, `import`, `variable`, `constant`, `test`, `script`, `src`, `eip712`
+
+### `scopelint fix`
+
+Applies safe, automatic fixes and then runs `scopelint check`. Currently supports:
+
+- **Unused imports**: Removes unused symbols from named imports (`import { A, B } from "..."`) and removes entire aliased import lines (`import "..." as Alias`) when the alias is unused.
+
+Only findings that are not ignored (via inline comments or `.scopelint`) are fixed. After fixing, any remaining convention or formatting issues are reported as with `scopelint check`.
 
 ### `scopelint spec`
 

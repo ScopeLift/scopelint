@@ -160,6 +160,8 @@ The project uses GitHub Actions for continuous integration:
 ## Development Workflow
 
 **Command Summary:**
+- `scopelint check` - Run convention checks
+- `scopelint fix` - Apply safe fixes (e.g. remove unused imports), then run check
 - `scopelint-dev` - Local development version (debug build)
 - `scopelint-beta` - Beta release version (release build with -beta suffix)
 - `scopelint` - Production version (from crates.io)
