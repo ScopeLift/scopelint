@@ -8,10 +8,10 @@ use solang_parser::pt::{
 };
 fn is_matching_file(parsed: &Parsed) -> bool {
     let file = &parsed.file;
-    file.is_file_kind(FileKind::Src, &parsed.path_config)
-        || file.is_file_kind(FileKind::Test, &parsed.path_config)
-        || file.is_file_kind(FileKind::Handler, &parsed.path_config)
-        || file.is_file_kind(FileKind::Script, &parsed.path_config)
+    file.is_file_kind(FileKind::Src, &parsed.path_config) ||
+        file.is_file_kind(FileKind::Test, &parsed.path_config) ||
+        file.is_file_kind(FileKind::Handler, &parsed.path_config) ||
+        file.is_file_kind(FileKind::Script, &parsed.path_config)
 }
 
 #[must_use]

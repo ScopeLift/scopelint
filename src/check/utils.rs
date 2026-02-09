@@ -134,10 +134,16 @@ impl IsFileKind for Path {
     fn is_file_kind(&self, kind: FileKind, paths: &CheckPaths) -> bool {
         let path = self.to_str().unwrap();
         match kind {
-            FileKind::Script => path.starts_with(paths.script_path.as_str()) && path.ends_with(".s.sol"),
+            FileKind::Script => {
+                path.starts_with(paths.script_path.as_str()) && path.ends_with(".s.sol")
+            }
             FileKind::Src => path.starts_with(paths.src_path.as_str()) && path.ends_with(".sol"),
-            FileKind::Test => path.starts_with(paths.test_path.as_str()) && path.ends_with(".t.sol"),
-            FileKind::Handler => path.starts_with(paths.test_path.as_str()) && path.ends_with(".handler.sol"),
+            FileKind::Test => {
+                path.starts_with(paths.test_path.as_str()) && path.ends_with(".t.sol")
+            }
+            FileKind::Handler => {
+                path.starts_with(paths.test_path.as_str()) && path.ends_with(".handler.sol")
+            }
         }
     }
 }

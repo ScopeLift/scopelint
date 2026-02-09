@@ -31,7 +31,7 @@ impl Default for CheckPaths {
 impl CheckPaths {
     /// Paths as a 3-element array for iterating (src, script, test).
     #[must_use]
-    pub fn as_array(&self) -> [&str; 3] {
+    pub const fn as_array(&self) -> [&str; 3] {
         [self.src_path.as_str(), self.script_path.as_str(), self.test_path.as_str()]
     }
 
@@ -44,9 +44,8 @@ impl CheckPaths {
             return Self::default();
         };
 
-        let content = match std::fs::read_to_string(&config_path) {
-            Ok(c) => c,
-            Err(_) => return Self::default(),
+        let Ok(content) = std::fs::read_to_string(&config_path) else {
+            return Self::default();
         };
 
         Self::from_toml(&content).unwrap_or_default()
@@ -73,42 +72,33 @@ impl CheckPaths {
     /// Parse paths from TOML. Uses `[check]` section if present, else Foundry's
     /// `[profile.default]` (or root) `src`, `test`, `script`.
     pub(crate) fn from_toml(content: &str) -> Result<Self, String> {
-        let toml: toml::Value = toml::from_str(content).map_err(|e| format!("Invalid TOML: {e}"))?;
+        let toml: toml::Value =
+            toml::from_str(content).map_err(|e| format!("Invalid TOML: {e}"))?;
 
         // Optional scopelint [check] overrides (src_path, script_path, test_path)
         let check_section = toml.get("check").and_then(|v| v.as_table());
 
-        let (src_path, script_path, test_path) = if let Some(check) = check_section {
-            let src = check
-                .get("src_path")
-                .and_then(|v| v.as_str())
-                .map(normalize_path);
-            let script = check
-                .get("script_path")
-                .and_then(|v| v.as_str())
-                .map(normalize_path);
-            let test = check
-                .get("test_path")
-                .and_then(|v| v.as_str())
-                .map(normalize_path);
-            (
-                src.unwrap_or_else(|| from_foundry_profile(&toml, "src")),
-                script.unwrap_or_else(|| from_foundry_profile(&toml, "script")),
-                test.unwrap_or_else(|| from_foundry_profile(&toml, "test")),
-            )
-        } else {
-            (
-                from_foundry_profile(&toml, "src"),
-                from_foundry_profile(&toml, "script"),
-                from_foundry_profile(&toml, "test"),
-            )
-        };
+        let (src_path, script_path, test_path) = check_section.map_or_else(
+            || {
+                (
+                    from_foundry_profile(&toml, "src"),
+                    from_foundry_profile(&toml, "script"),
+                    from_foundry_profile(&toml, "test"),
+                )
+            },
+            |check| {
+                let src = check.get("src_path").and_then(|v| v.as_str()).map(normalize_path);
+                let script = check.get("script_path").and_then(|v| v.as_str()).map(normalize_path);
+                let test = check.get("test_path").and_then(|v| v.as_str()).map(normalize_path);
+                (
+                    src.unwrap_or_else(|| from_foundry_profile(&toml, "src")),
+                    script.unwrap_or_else(|| from_foundry_profile(&toml, "script")),
+                    test.unwrap_or_else(|| from_foundry_profile(&toml, "test")),
+                )
+            },
+        );
 
-        Ok(Self {
-            src_path,
-            script_path,
-            test_path,
-        })
+        Ok(Self { src_path, script_path, test_path })
     }
 }
 
@@ -121,7 +111,6 @@ fn from_foundry_profile(toml: &toml::Value, key: &str) -> String {
         .and_then(|v| v.as_str());
     let root = toml.get(key).and_then(|v| v.as_str());
     let raw = profile.or(root).unwrap_or(match key {
-        "src" => "src",
         "script" => "script",
         "test" => "test",
         _ => "src",
@@ -211,4 +200,3 @@ src_path = "./contracts"
         assert_eq!(p.test_path, "./test");
     }
 }
-

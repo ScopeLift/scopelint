@@ -1,8 +1,10 @@
-use crate::check::{
-    comments::Comments,
-    inline_config::{InlineConfig, InvalidInlineConfigItem},
+use crate::{
+    check::{
+        comments::Comments,
+        inline_config::{InlineConfig, InvalidInlineConfigItem},
+    },
+    foundry_config::CheckPaths,
 };
-use crate::foundry_config::CheckPaths;
 use colored::Colorize;
 use itertools::Itertools;
 use solang_parser::pt::{Loc, SourceUnit};

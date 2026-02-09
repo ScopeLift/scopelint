@@ -3,8 +3,10 @@
 // extensions manually with `ends_with`.
 #![allow(clippy::case_sensitive_file_extension_comparisons)]
 
-use crate::check::utils::{Name, VisibilitySummary};
-use crate::foundry_config::CheckPaths;
+use crate::{
+    check::utils::{Name, VisibilitySummary},
+    foundry_config::CheckPaths,
+};
 use colored::Colorize;
 use solang_parser::pt::{
     ContractDefinition, ContractPart, ContractTy, FunctionDefinition, SourceUnitPart,
