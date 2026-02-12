@@ -6,8 +6,10 @@
   keywords = ["foundry", "linting", "formatting"]
   license = "MIT"
   name = "scopelint"
+  readme = "README.md"
   repository = "https://github.com/ScopeLift/scopelint"
-  version = "0.0.21"
+  homepage = "https://github.com/ScopeLift/scopelint"
+  version = "0.1.0"
 
 [dependencies]
   clap = { version = "4.4.2", features = ["derive"] }

@@ -187,3 +187,22 @@ scopelint-dev --help
 # Test beta
 scopelint-beta --version
 ```
+
+### Publishing releases (GitHub + crates.io)
+
+Releases are driven by the [release workflow](.github/workflows/release.yml). It runs on:
+
+- **Manual**: workflow_dispatch
+- **Tag push**: `v*.*.*` (e.g. `v0.0.22`)
+
+The workflow builds multi-platform binaries, uploads them to the GitHub Release, and publishes the crate to crates.io.
+
+**One-time setup for crates.io (Trusted Publishing)**  
+Publishing uses [Trusted Publishing](https://crates.io/docs/trusted-publishing) (no long-lived API token). Add this workflow as a Trusted Publisher once:
+
+1. Open the crate on crates.io → **Settings** → **Trusted Publishing** → **Add**.
+2. Choose **GitHub**.
+3. Set **Repository owner**: `ScopeLift`, **Repository name**: `scopelint`, **Workflow filename**: `release.yml`.
+4. (Optional) Set **Environment** to a dedicated environment (e.g. `release`) for stricter access control.
+
+After that, pushing a version tag (or running the workflow manually) will publish to crates.io automatically.
