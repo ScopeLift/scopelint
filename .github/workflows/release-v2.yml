@@ -1,11 +1,18 @@
-# Release v2: modern workflow with crates.io Trusted Publishing.
-# Use this to test the new flow. On crates.io add Trusted Publisher with workflow filename: release-v2.yml
-name: Release v2
+# Release modern workflow with crates.io Trusted Publishing.
+# Use this to test the new flow. On crates.io add Trusted Publisher with workflow filename: release.yml
+# Manual only: run from Actions → Release v2 → Run workflow, and select the version tag (e.g. v1.0.0) as the ref.
+name: Release
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+  # Uncomment this to release on tag push
+  # push:
+  #   tags:
+  #     - 'v[0-9]+.[0-9]+.[0-9]+'
+  inputs:
+    tag:
+      description: 'Release tag (must already exist in the repo, e.g. v1.0.0)'
+      required: true
+      type: string
 
 env:
   BIN_NAME: scopelint
@@ -22,12 +29,12 @@ jobs:
         build: [x86_64-linux, aarch64-linux, x86_64-macos, x86_64-windows, aarch64-macos]
         include:
           - build: x86_64-linux
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             rust: stable
             target: x86_64-unknown-linux-gnu
             cross: true
           - build: aarch64-linux
-            os: ubuntu-20.04
+            os: ubuntu-22.04
             rust: stable
             target: aarch64-unknown-linux-gnu
             cross: true
@@ -99,6 +106,7 @@ jobs:
     needs: [dist]
     runs-on: ubuntu-latest
     permissions:
+      contents: write  # Required to create releases and upload assets
       id-token: write  # Required for crates.io Trusted Publishing (OIDC)
     steps:
       - name: Checkout sources
@@ -115,8 +123,9 @@ jobs:
       - name: Calculate tag name
         run: |
           name=dev
-          if [[ $GITHUB_REF == refs/tags/v* ]]; then
-            name=${GITHUB_REF:10}
+          if [[ -z "$name" || "$name" != v* ]]; then
+            echo "::error::Release tag must be set and start with 'v' (e.g. v1.0.0)"
+            exit 1
           fi
           echo "val=$name" >> $GITHUB_OUTPUT
           echo TAG=$name >> $GITHUB_ENV
