@@ -1,18 +1,9 @@
-# Release modern workflow with crates.io Trusted Publishing.
-# Use this to test the new flow. On crates.io add Trusted Publisher with workflow filename: release.yml
-# Manual only: run from Actions → Release v2 → Run workflow, and select the version tag (e.g. v1.0.0) as the ref.
-name: Release
+name: Release Old
 on:
   workflow_dispatch:
-  # Uncomment this to release on tag push
-  # push:
-  #   tags:
-  #     - 'v[0-9]+.[0-9]+.[0-9]+'
-  inputs:
-    tag:
-      description: 'Release tag (must already exist in the repo, e.g. v1.0.0)'
-      required: true
-      type: string
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
 
 env:
   BIN_NAME: scopelint
@@ -24,17 +15,17 @@ jobs:
     name: Dist
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: true
+      fail-fast: true # Fail other jobs if one fails.
       matrix:
         build: [x86_64-linux, aarch64-linux, x86_64-macos, x86_64-windows, aarch64-macos]
         include:
           - build: x86_64-linux
-            os: ubuntu-22.04
+            os: ubuntu-20.04
             rust: stable
             target: x86_64-unknown-linux-gnu
             cross: true
           - build: aarch64-linux
-            os: ubuntu-22.04
+            os: ubuntu-20.04
             rust: stable
             target: aarch64-unknown-linux-gnu
             cross: true
@@ -56,7 +47,7 @@ jobs:
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Install ${{ matrix.rust }} toolchain
         uses: actions-rs/toolchain@v1
@@ -65,6 +56,21 @@ jobs:
           toolchain: ${{ matrix.rust }}
           target: ${{ matrix.target }}
           override: true
+
+      # Currently skipping tests because it fails with:
+      #   thread 'test_check_proj1_all_findings' panicked at 'Failed to execute command: Os { code: 2, kind: NotFound, message: "No such file or directory" }', tests/cli.rs:18:10
+      # when run here, even though tests work fine in the other actions file.
+
+      # # We skip tests for M1 (arm64), because the binary is for M1 but the github runner is Intel,
+      # # so it can't run the binary/tests. However, the Intel macOS can build the binaries for M1
+      # # which is what happens here.
+      # - name: Run cargo test
+      #   uses: actions-rs/cargo@v1
+      #   if: ${{ matrix.build != 'aarch64-macos' }}
+      #   with:
+      #     use-cross: ${{ matrix.cross }}
+      #     command: test
+      #     args: --release --locked --target ${{ matrix.target }}
 
       - name: Build release binary
         uses: actions-rs/cargo@v1
@@ -96,7 +102,7 @@ jobs:
             cp "target/${{ matrix.target }}/release/$BIN_NAME" "dist/"
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v2.2.4
         with:
           name: bins-${{ matrix.build }}
           path: dist
@@ -105,29 +111,25 @@ jobs:
     name: Publish
     needs: [dist]
     runs-on: ubuntu-latest
-    permissions:
-      contents: write  # Required to create releases and upload assets
-      id-token: write  # Required for crates.io Trusted Publishing (OIDC)
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
         with:
           submodules: false
 
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: 'bins-*'
-          merge-multiple: false
+      - uses: actions/download-artifact@v2
+        # with:
+        #   path: dist
+      # - run: ls -al ./dist
       - run: ls -al bins-*
 
       - name: Calculate tag name
         run: |
           name=dev
-          if [[ -z "$name" || "$name" != v* ]]; then
-            echo "::error::Release tag must be set and start with 'v' (e.g. v1.0.0)"
-            exit 1
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            name=${GITHUB_REF:10}
           fi
-          echo "val=$name" >> $GITHUB_OUTPUT
+          echo ::set-output name=val::$name
           echo TAG=$name >> $GITHUB_ENV
         id: tagname
 
@@ -135,24 +137,28 @@ jobs:
         shell: bash
         run: |
           set -ex
+
           rm -rf tmp
           mkdir tmp
           mkdir dist
+
           for dir in bins-* ; do
-            platform=${dir#"bins-"}
-            unset exe
-            if [[ $platform =~ "windows" ]]; then
-              exe=".exe"
-            fi
-            pkgname=$PROJECT_NAME-$platform
-            mkdir tmp/$pkgname
-            mv bins-$platform/$BIN_NAME$exe tmp/$pkgname
-            chmod +x tmp/$pkgname/$BIN_NAME$exe
-            if [ "$exe" = "" ]; then
-              tar cJf dist/$pkgname.tar.xz -C tmp $pkgname
-            else
-              (cd tmp && 7z a -r ../dist/$pkgname.zip $pkgname)
-            fi
+              platform=${dir#"bins-"}
+              unset exe
+              if [[ $platform =~ "windows" ]]; then
+                  exe=".exe"
+              fi
+              pkgname=$PROJECT_NAME-$platform
+              mkdir tmp/$pkgname
+              # cp LICENSE README.md tmp/$pkgname
+              mv bins-$platform/$BIN_NAME$exe tmp/$pkgname
+              chmod +x tmp/$pkgname/$BIN_NAME$exe
+
+              if [ "$exe" = "" ]; then
+                  tar cJf dist/$pkgname.tar.xz -C tmp $pkgname
+              else
+                  (cd tmp && 7z a -r ../dist/$pkgname.zip $pkgname)
+              fi
           done
 
       - name: Upload binaries to release
@@ -164,14 +170,21 @@ jobs:
           tag: ${{ steps.tagname.outputs.val }}
           overwrite: true
 
-      - name: Authenticate with crates.io
-        id: auth
-        uses: rust-lang/crates-io-auth-action@v1
+      - name: Extract version
+        id: extract-version
+        run: |
+          printf "::set-output name=%s::%s\n" tag-name "${GITHUB_REF#refs/tags/}"
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Publish to crates.io
-        run: cargo publish --allow-dirty
+      # Uncomment this section if you want to release your package to crates.io
+      # Before publishing, make sure you have filled out the following fields:
+      # license or license-file, description, homepage, documentation, repository, readme.
+      # Read more: https://doc.rust-lang.org/cargo/reference/publishing.html
+      - name: Install ${{ matrix.rust }} toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          target: ${{ matrix.target }}
+      - run: cargo publish --token ${CRATES_TOKEN} --allow-dirty
         env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
