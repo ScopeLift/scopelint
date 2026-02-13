@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# scopelintup bootstrap installer
+# Usage: curl -L https://raw.githubusercontent.com/ScopeLift/scopelint/main/scopelintup/install | bash
+
+SCOPELINT_DIR="${SCOPELINT_DIR:-$HOME/.scopelint}"
+SCOPELINT_BIN_DIR="$SCOPELINT_DIR/bin"
+REPO="ScopeLift/scopelint"
+SCOPELINTUP_URL="https://raw.githubusercontent.com/$REPO/main/scopelintup/scopelintup"
+
+say() { printf "\033[1;32mscopelintup\033[0m: %s\n" "$*"; }
+err() { printf "\033[1;31mscopelintup\033[0m: error: %s\n" "$*" >&2; exit 1; }
+
+need_cmd() {
+  command -v "$1" > /dev/null 2>&1 || err "need '$1' (command not found)"
+}
+
+need_cmd curl
+
+# 1. Create directory structure.
+say "creating $SCOPELINT_DIR ..."
+mkdir -p "$SCOPELINT_BIN_DIR"
+mkdir -p "$SCOPELINT_DIR/versions"
+
+# 2. Download scopelintup.
+say "downloading scopelintup..."
+curl -fsSL -o "$SCOPELINT_DIR/scopelintup" "$SCOPELINTUP_URL"
+chmod +x "$SCOPELINT_DIR/scopelintup"
+
+# 3. Symlink scopelintup into bin dir.
+ln -sf "$SCOPELINT_DIR/scopelintup" "$SCOPELINT_BIN_DIR/scopelintup"
+
+# 4. Write the shim by invoking scopelintup's write_shim (just generate inline).
+cat > "$SCOPELINT_BIN_DIR/scopelint" <<'SHIM'
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCOPELINT_DIR="${SCOPELINT_DIR:-$HOME/.scopelint}"
+
+resolve_from_file() {
+  local dir="$PWD"
+  while [[ "$dir" != "/" ]]; do
+    if [[ -f "$dir/.scopelint-version" ]]; then
+      cat "$dir/.scopelint-version"
+      return
+    fi
+    dir="$(dirname "$dir")"
+  done
+}
+
+version=$(resolve_from_file)
+
+if [[ -z "${version:-}" ]]; then
+  version="${SCOPELINT_VERSION:-}"
+fi
+
+if [[ -z "${version:-}" && -f "$SCOPELINT_DIR/.current_version" ]]; then
+  version=$(cat "$SCOPELINT_DIR/.current_version")
+fi
+
+if [[ -z "${version:-}" ]]; then
+  echo "scopelint: no version configured." >&2
+  echo "  Run 'scopelintup' to install the latest version," >&2
+  echo "  or create a .scopelint-version file." >&2
+  exit 1
+fi
+
+[[ "$version" == v* ]] || version="v$version"
+
+binary="$SCOPELINT_DIR/versions/$version/scopelint"
+if [[ ! -x "$binary" ]]; then
+  echo "scopelint: version $version is not installed." >&2
+  echo "  Run 'scopelintup --version $version' to install it." >&2
+  exit 1
+fi
+
+exec "$binary" "$@"
+SHIM
+chmod +x "$SCOPELINT_BIN_DIR/scopelint"
+
+# 5. Add to PATH in shell profiles if not already present.
+add_to_path() {
+  local profile="$1"
+  if [[ -f "$profile" ]] && grep -q 'scopelint/bin' "$profile" 2>/dev/null; then
+    return
+  fi
+  # Only touch files that already exist or the most common default.
+  [[ -f "$profile" ]] || return
+  echo >> "$profile"
+  echo '# scopelint version manager' >> "$profile"
+  echo 'export PATH="$HOME/.scopelint/bin:$PATH"' >> "$profile"
+  say "added ~/.scopelint/bin to PATH in $profile"
+}
+
+case "$(basename "${SHELL:-bash}")" in
+  zsh)  add_to_path "$HOME/.zshrc" ;;
+  bash)
+    # Prefer .bashrc, fall back to .bash_profile on macOS.
+    if [[ -f "$HOME/.bashrc" ]]; then
+      add_to_path "$HOME/.bashrc"
+    elif [[ -f "$HOME/.bash_profile" ]]; then
+      add_to_path "$HOME/.bash_profile"
+    fi
+    ;;
+  fish)
+    # fish uses a different mechanism; just inform the user.
+    say "add 'set -gx PATH \$HOME/.scopelint/bin \$PATH' to your fish config"
+    ;;
+  *) add_to_path "$HOME/.profile" ;;
+esac
+
+# 6. Optionally install the latest scopelint.
+say ""
+say "scopelintup installed successfully!"
+say ""
+say "To install the latest scopelint, run:"
+say "  scopelintup"
+say ""
+say "If 'scopelintup' is not found, start a new terminal or run:"
+say "  export PATH=\"\$HOME/.scopelint/bin:\$PATH\""
