@@ -1,18 +1,17 @@
-# Release modern workflow with crates.io Trusted Publishing.
-# Use this to test the new flow. On crates.io add Trusted Publisher with workflow filename: release.yml
-# Manual only: run from Actions → Release → Run workflow, and select the version tag (e.g. v0.1.0) as the ref.
-name: Release
+# Release v2: modern workflow with crates.io Trusted Publishing.
+# Manual only: Actions → Release v2 → Run workflow, enter the version tag (e.g. v1.0.0).
+name: Release v2
 on:
   workflow_dispatch:
-  # Uncomment this to release on tag push
-  # push:
-  #   tags:
-  #     - 'v[0-9]+.[0-9]+.[0-9]+'
-  inputs:
-    tag:
-      description: 'Release tag (must already exist in the repo, e.g. v0.1.0)'
-      required: true
-      type: string
+    # Manual only: run from Actions → Release v2 → Run workflow, and select the version tag (e.g. v1.0.0) as the ref.
+    # push:
+    #   tags:
+    #     - 'v[0-9]+.[0-9]+.[0-9]+'
+    inputs:
+      tag:
+        description: 'Release tag (must already exist in the repo, e.g. v1.0.0)'
+        required: true
+        type: string
 
 env:
   BIN_NAME: scopelint
@@ -44,7 +43,7 @@ jobs:
             target: x86_64-apple-darwin
             cross: true
           - build: x86_64-windows
-            os: windows-2019
+            os: windows-2022
             rust: stable
             target: x86_64-pc-windows-msvc
             cross: true
@@ -90,7 +89,7 @@ jobs:
         shell: bash
         run: |
           mkdir dist
-          if [ "${{ matrix.os }}" = "windows-2019" ]; then
+          if [ "${{ matrix.os }}" = "windows-2022" ]; then
             cp "target/${{ matrix.target }}/release/$BIN_NAME.exe" "dist/"
           else
             cp "target/${{ matrix.target }}/release/$BIN_NAME" "dist/"
@@ -121,10 +120,11 @@ jobs:
       - run: ls -al bins-*
 
       - name: Calculate tag name
+        shell: bash
         run: |
-          name="${{ inputs.tag }}"
+          name="${{ github.event.inputs.tag }}"
           if [[ -z "$name" || "$name" != v* ]]; then
-            echo "::error::Release tag must be set and start with 'v' (e.g. v0.1.0)"
+            echo "::error::Release tag must be set and start with 'v' (e.g. v1.0.0)"
             exit 1
           fi
           echo "val=$name" >> $GITHUB_OUTPUT
