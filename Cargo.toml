@@ -1,5 +1,5 @@
 [package]
-  categories = ["development-tools", "development-tools::linters"]
+  categories = ["development-tools"]
   description = "An opinionated formatting and linting tool for foundry projects"
   edition = "2021"
   include = ["/src"]

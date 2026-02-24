@@ -104,6 +104,7 @@ jobs:
     name: Publish
     needs: [dist]
     runs-on: ubuntu-latest
+    environment: crates-release
     permissions:
       contents: write  # Required to create releases and upload assets
       id-token: write  # Required for crates.io Trusted Publishing (OIDC)
