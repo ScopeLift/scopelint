@@ -1,11 +1,15 @@
-use crate::check::{
-    comments::Comments,
-    inline_config::{InlineConfig, InvalidInlineConfigItem},
+use crate::{
+    check::{
+        comments::Comments,
+        inline_config::{InlineConfig, InvalidInlineConfigItem},
+    },
+    foundry_config::CheckPaths,
 };
 use colored::Colorize;
 use itertools::Itertools;
 use solang_parser::pt::{Loc, SourceUnit};
 use std::{
+    collections::HashSet,
     error::Error,
     ffi::OsStr,
     fs,
@@ -18,6 +22,9 @@ pub mod comments;
 
 /// Contains all the types and methods to define and parse inline config items.
 pub mod inline_config;
+
+/// Contains configuration file parser for `.scopelint` file.
+pub mod file_config;
 
 /// Contains all the types and methods to generate a report of all the invalid items found.
 pub mod report;
@@ -45,18 +52,102 @@ pub fn run(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> 
     }
 }
 
+/// Applies safe fixes (e.g. remove unused imports), then runs check.
+///
+/// # Errors
+///
+/// Returns an error if fixes could not be applied or if convention checks still fail after
+/// fixing.
+pub fn run_fix(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn Error>> {
+    let path_config = CheckPaths::load();
+    let results = validate(&path_config)?;
+
+    let fixable_imports: Vec<&utils::InvalidItem> = results
+        .items()
+        .iter()
+        .filter(|item| {
+            item.kind == utils::ValidatorKind::Import && !item.is_disabled && !item.is_ignored
+        })
+        .collect();
+
+    if fixable_imports.is_empty() {
+        // No fixable import issues; run normal check and return its result.
+        let valid_names = validate_conventions();
+        let valid_fmt = validators::formatting::validate(taplo_opts);
+        if valid_names.is_ok() && valid_fmt.is_ok() {
+            return Ok(());
+        }
+        return Err("One or more checks failed, review above output".into());
+    }
+
+    let file_config = file_config::FileConfig::load();
+
+    // Group fixable import items by file and collect symbol names to remove.
+    let by_file: std::collections::HashMap<&str, HashSet<String>> = fixable_imports
+        .iter()
+        .map(|item| {
+            let symbol = extract_unused_import_symbol(&item.text);
+            (item.file.as_str(), symbol)
+        })
+        .fold(std::collections::HashMap::new(), |mut acc, (file, symbol)| {
+            acc.entry(file).or_default().insert(symbol);
+            acc
+        });
+
+    let mut fixed_count = 0_usize;
+    for (file_path, symbols) in &by_file {
+        let path = Path::new(file_path);
+        if !path.exists() {
+            continue;
+        }
+        let mut parsed = parse(path)?;
+        parsed.file_config = file_config.clone();
+        parsed.path_config = path_config.clone();
+
+        if let Some(new_src) = validators::unused_imports::fix_source(&parsed, Some(symbols)) {
+            fs::write(path, new_src)?;
+            fixed_count += 1;
+        }
+    }
+
+    if fixed_count > 0 {
+        eprintln!("{}: Fixed unused imports in {} file(s)", "info".bold().green(), fixed_count);
+    }
+
+    // Re-run check and report any remaining issues.
+    let valid_names = validate_conventions();
+    let valid_fmt = validators::formatting::validate(taplo_opts);
+    if valid_names.is_ok() && valid_fmt.is_ok() {
+        Ok(())
+    } else {
+        Err("One or more checks failed, review above output".into())
+    }
+}
+
+/// Extracts the symbol name from an "Unused import: '`SymbolName`'" message.
+fn extract_unused_import_symbol(text: &str) -> String {
+    const PREFIX: &str = "Unused import: '";
+    const SUFFIX: char = '\'';
+    if let Some(stripped) = text.strip_prefix(PREFIX) {
+        if let Some(symbol) = stripped.strip_suffix(SUFFIX) {
+            return symbol.to_string();
+        }
+    }
+    text.to_string()
+}
+
 // =============================
 // ======== Validations ========
 // =============================
 
 fn validate_conventions() -> Result<(), Box<dyn Error>> {
-    let paths = ["./src", "./script", "./test"];
-    let results = validate(paths)?;
+    let path_config = CheckPaths::load();
+    let results = validate(&path_config)?;
 
     if !results.is_valid() {
         eprint!("{results}");
         eprintln!("{}: Convention checks failed, see details above", "error".bold().red());
-        return Err("Invalid names found".into())
+        return Err("Invalid names found".into());
     }
     Ok(())
 }
@@ -76,6 +167,10 @@ pub struct Parsed {
     pub inline_config: InlineConfig,
     /// Invalid inline config items parsed.
     pub invalid_inline_config_items: Vec<(Loc, InvalidInlineConfigItem)>,
+    /// File-level configuration from `.scopelint` file.
+    pub file_config: file_config::FileConfig,
+    /// Path configuration from foundry.toml (src/script/test dirs).
+    pub path_config: CheckPaths,
 }
 
 /// Parses the source code and returns a [`Parsed`] struct.
@@ -86,7 +181,7 @@ pub struct Parsed {
 pub fn parse(file: &Path) -> Result<Parsed, Box<dyn Error>> {
     let src = &fs::read_to_string(file)?;
 
-    let (pt, comments) = solang_parser::parse(src, 0).map_err(|d| {
+    let (pt, comments) = crate::parser::parse_solidity(src, 0).map_err(|d| {
         eprintln!("{d:?}");
         "Failed to parse file".to_string()
     })?;
@@ -95,6 +190,9 @@ pub fn parse(file: &Path) -> Result<Parsed, Box<dyn Error>> {
     let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
         comments.parse_inline_config_items().partition_result();
     let inline_config = InlineConfig::new(inline_config_items, src);
+    // File config and path config will be set by the caller (validate function)
+    let file_config = file_config::FileConfig::default();
+    let path_config = CheckPaths::default();
 
     Ok(Parsed {
         file: file.to_owned(),
@@ -103,29 +201,48 @@ pub fn parse(file: &Path) -> Result<Parsed, Box<dyn Error>> {
         comments,
         inline_config,
         invalid_inline_config_items,
+        file_config,
+        path_config,
     })
 }
 
 // Core validation method that walks the directory and validates all Solidity files.
-fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
+fn validate(path_config: &CheckPaths) -> Result<report::Report, Box<dyn Error>> {
     let mut results = report::Report::default();
+    let file_config = file_config::FileConfig::load();
 
-    for path in paths {
+    for path in path_config.as_array() {
+        // Skip if the directory doesn't exist (e.g., script folder may not be created yet).
+        let path_buf = Path::new(path);
+        if !path_buf.exists() || !path_buf.is_dir() {
+            continue;
+        }
+
         for result in WalkDir::new(path) {
             let dent = match result {
                 Ok(dent) => dent,
                 Err(err) => {
                     eprintln!("{err}");
-                    continue
+                    continue;
                 }
             };
 
             if !dent.file_type().is_file() || dent.path().extension() != Some(OsStr::new("sol")) {
-                continue
+                continue;
+            }
+
+            let file_path = dent.path();
+
+            // Check if file should be ignored entirely
+            if file_config.is_file_ignored(file_path) {
+                continue;
             }
 
             // Get the parse tree (pt) of the file and extract inline configs.
-            let parsed = parse(dent.path())?;
+            let mut parsed = parse(file_path)?;
+            // Attach file config and path config to parsed struct
+            parsed.file_config = file_config.clone();
+            parsed.path_config = path_config.clone();
 
             // If there are any invalid inline config items, add them to the results.
             for invalid_item in &parsed.invalid_inline_config_items {
@@ -142,6 +259,11 @@ fn validate(paths: [&str; 3]) -> Result<report::Report, Box<dyn Error>> {
             results.add_items(validators::src_names_internal::validate(&parsed));
             results.add_items(validators::script_has_public_run_method::validate(&parsed));
             results.add_items(validators::constant_names::validate(&parsed));
+            results.add_items(validators::src_spdx_header::validate(&parsed));
+            results.add_items(validators::variable_names::validate(&parsed));
+            results.add_items(validators::error_prefix::validate(&parsed));
+            results.add_items(validators::eip712_typehash::validate(&parsed));
+            results.add_items(validators::unused_imports::validate(&parsed));
         }
     }
     Ok(results)

@@ -7,7 +7,9 @@ A simple and opinionated tool designed for basic formatting/linting of Solidity 
   - [Usage](#usage)
     - [`scopelint fmt`](#scopelint-fmt)
     - [`scopelint check`](#scopelint-check)
+    - [`scopelint fix`](#scopelint-fix)
     - [`scopelint spec`](#scopelint-spec)
+  - [Development](#development)
 
 ## Installation
 
@@ -18,10 +20,11 @@ When using the [ScopeLift Foundry template](https://github.com/ScopeLift/foundry
 
 ## Usage
 
-Once installed there are three commands:
+Once installed there are four commands:
 
 - `scopelint fmt`
 - `scopelint check`
+- `scopelint fix`
 - `scopelint spec`
 
 For all commands, please open issues for any bug reports, suggestions, or feature requests.
@@ -33,6 +36,9 @@ This command will format:
 - Solidity files using the configuration specified in `foundry.toml`.
 - TOML files using a hardcoded configuration that indents keys and sorts them alphabetically to improve readability.
 
+**Flags:**
+- `--check`: Show changes without modifying files (dry run mode)
+
 ### `scopelint check`
 
 This command ensures that development [best practices](https://book.getfoundry.sh/tutorials/best-practices) are consistently followed by validating that:
@@ -40,12 +46,63 @@ This command ensures that development [best practices](https://book.getfoundry.s
 - Test names follow a convention of `^test(Fork)?(Fuzz)?(_Revert(If|When|On))?_(\w+)*$`. (To see a list of example valid test names, see [here](https://github.com/ScopeLift/scopelint/blob/1857e3940bfe92ac5a136827374f4b27ff083971/src/check/validators/test_names.rs#L106-L127)).
 - Constants and immutables are in `ALL_CAPS`.
 - Function names and visibility in forge scripts only have 1 public `run` method per script.
-- Internal or private functions in the `src/` directory start with a leading underscore.
+- Internal or private functions in the source directory start with a leading underscore.
+
+**Path configuration:** `scopelint check` (and `scopelint spec`) use your existing Foundry paths so they work with non-default layouts (e.g. `contracts/` instead of `src/`). Paths are read from `foundry.toml` in the same way as Forge:
+
+- If present, `[profile.default]` (or root-level) `src`, `test`, and `script` are used.
+- You can override them for scopelint only with an optional `[check]` section:
+
+  ```toml
+  [profile.default]
+  src = "contracts"
+  test = "test"
+  script = "script"
+
+  # Optional: scopelint-specific path overrides (defaults to profile.default if omitted)
+  [check]
+  src_path = "./contracts"
+  script_path = "./script"
+  test_path = "./test"
+  ```
+
+  If `[check]` is omitted, Foundry’s paths are used as-is, so no re-definition is required.
 
 [More checks](https://github.com/ScopeLift/scopelint/issues/10) are planned for the future.
 
-Scopelint is opinionated in that it does not currently let you configure these checks or turn any off.
-However, if there is demand for this it may be added in a future version.
+Scopelint is opinionated in that it does not let you disable rules globally.
+However, you can ignore specific rules for specific files using:
+
+1. **Inline comments** in your Solidity files:
+   ```solidity
+   // scopelint: ignore-src-file  // Ignore 'src' rule for entire file
+   // scopelint: ignore-error-next-line  // Ignore 'error' rule for next line
+   ```
+
+2. **`.scopelint` config file** in your project root:
+   ```toml
+   # Ignore entire files
+   [ignore]
+   files = [
+       "src/legacy/old.sol",
+       "test/integration/*.sol"
+   ]
+
+   # Ignore specific rules for specific files
+   [ignore.overrides]
+   "src/BaseBridgeReceiver.sol" = ["src"]  # Only ignore 'src' rule
+   "src/legacy/**/*.sol" = ["src", "error"]  # Ignore multiple rules
+   ```
+
+   Supported rules: `error`, `import`, `variable`, `constant`, `test`, `script`, `src`, `eip712`
+
+### `scopelint fix`
+
+Applies safe, automatic fixes and then runs `scopelint check`. Currently supports:
+
+- **Unused imports**: Removes unused symbols from named imports (`import { A, B } from "..."`) and removes entire aliased import lines (`import "..." as Alias`) when the alias is unused.
+
+Only findings that are not ignored (via inline comments or `.scopelint`) are fixed. After fixing, any remaining convention or formatting issues are reported as with `scopelint check`.
 
 ### `scopelint spec`
 
@@ -60,7 +117,20 @@ Below is a simple example for an ERC-20 token, the full example repo can be foun
 
 ![erc20-scopelint-spec-example](./assets/spec.gif)
 
+**Flags:**
+- `--show-internal`: Include internal and private functions in the specification (by default, only public and external functions are shown)
+
 Currently this feature is in beta, and we are looking for feedback on how to improve it.
 Right now it's focused on specifications for unit tests, which are very useful for developers but less useful for higher-level stakeholders.
 As a result, it does not yet include information about protocol invariants or integration test / user-story types of specifications.
 If you have any thoughts or ideas, please open an issue [here](https://github.com/ScopeLift/scopelint/issues/new).
+
+## Development
+
+For developers interested in contributing to `scopelint`, please see our [Development Guide](DEV.md) for detailed information about:
+
+- Setting up the development environment
+- Project structure and architecture
+- Adding new validators and features
+- Testing and code quality standards
+- Contributing guidelines

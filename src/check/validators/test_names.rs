@@ -2,24 +2,24 @@ use crate::check::{
     utils::{FileKind, InvalidItem, IsFileKind, Name, ValidatorKind, VisibilitySummary},
     Parsed,
 };
-use once_cell::sync::Lazy;
 use regex::Regex;
 use solang_parser::pt::{ContractPart, FunctionDefinition, SourceUnitPart};
-use std::path::Path;
+use std::sync::LazyLock;
 
 // A regex matching valid test names, see the `validate_test_names_regex` test for examples.
-static RE_VALID_TEST_NAME: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^test(Fork)?(Fuzz)?(_Revert(If|When|On|Given))?_(\w+)*$").unwrap());
+static RE_VALID_TEST_NAME: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^test(Fork)?(Fuzz)?(_Revert(If|When|On|Given))?_(\w+)*$").unwrap()
+});
 
-fn is_matching_file(file: &Path) -> bool {
-    file.is_file_kind(FileKind::Test)
+fn is_matching_file(parsed: &Parsed) -> bool {
+    parsed.file.is_file_kind(FileKind::Test, &parsed.path_config)
 }
 
 #[must_use]
 /// Validates that test names are in the correct format.
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
-    if !is_matching_file(&parsed.file) {
-        return Vec::new()
+    if !is_matching_file(parsed) {
+        return Vec::new();
     }
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
@@ -48,7 +48,7 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
 fn is_valid_test_name(name: &str) -> bool {
     // Check that name matches the allowed pattern.
     if !name.starts_with("test") || !RE_VALID_TEST_NAME.is_match(name) {
-        return false
+        return false;
     }
 
     // Verify the revert naming convention. This is a workaround for the regex create not supporting
@@ -59,7 +59,7 @@ fn is_valid_test_name(name: &str) -> bool {
     for segment in segments {
         // If the segment contains `Revert` but does not start with `Revert` it is invalid.
         if segment.contains("Revert") && !segment.starts_with("Revert") {
-            return false
+            return false;
         }
 
         // If the segment starts with `Revert` it is valid if the rest of the segment is exactly

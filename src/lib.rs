@@ -10,6 +10,12 @@ pub mod check;
 /// Parses library configuration.
 pub mod config;
 
+/// Path configuration from foundry.toml.
+pub mod foundry_config;
+
+/// Parses Solidity source files.
+pub mod parser;
+
 /// Formats Solidity and TOML files.
 pub mod fmt;
 
@@ -33,9 +39,10 @@ pub fn run(opts: &config::Opts) -> Result<(), Box<dyn Error>> {
     };
 
     // Execute commands.
-    match opts.subcommand {
+    match &opts.subcommand {
         config::Subcommands::Check => check::run(taplo_opts),
-        config::Subcommands::Fmt => fmt::run(taplo_opts),
-        config::Subcommands::Spec => spec::run(),
+        config::Subcommands::Fmt { check } => fmt::run(taplo_opts, *check),
+        config::Subcommands::Fix => check::run_fix(taplo_opts),
+        config::Subcommands::Spec { show_internal } => spec::run(*show_internal),
     }
 }

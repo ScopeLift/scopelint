@@ -4,6 +4,7 @@
 #![allow(clippy::case_sensitive_file_extension_comparisons)]
 
 use super::Parsed;
+use crate::foundry_config::CheckPaths;
 use solang_parser::pt::{
     FunctionAttribute, FunctionDefinition, FunctionTy, Loc, SourceUnit, Visibility,
 };
@@ -14,7 +15,7 @@ use std::path::Path;
 // ===============================-=======
 
 /// The type of validator that found the invalid item.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub enum ValidatorKind {
     /// A constant or immutable variable.
     Constant,
@@ -26,6 +27,14 @@ pub enum ValidatorKind {
     Test,
     /// A `// scopelint: <directive>` comment.
     Directive,
+    /// A variable naming convention.
+    Variable,
+    /// An error definition.
+    Error,
+    /// An EIP712 typehash validation issue.
+    Eip712,
+    /// An unused import.
+    Import,
 }
 
 /// A single invalid item found by a validator.
@@ -36,16 +45,23 @@ pub struct InvalidItem {
     pub text: String,      // Details to show about the invalid item.
     pub line: usize,       // Line number.
     pub is_disabled: bool, // Whether the invalid item is in a disabled region.
+    pub is_ignored: bool,  // Whether the invalid item is in an ignored region.
 }
 
 impl InvalidItem {
     #[must_use]
     /// Creates a new `InvalidItem`.
     pub fn new(kind: ValidatorKind, parsed: &Parsed, loc: Loc, text: String) -> Self {
-        let Parsed { file, src, inline_config, .. } = parsed;
+        let Parsed { file, src, inline_config, file_config, .. } = parsed;
         let line = offset_to_line(src, loc.start());
         let is_disabled = inline_config.is_disabled(loc);
-        Self { kind, file: file.display().to_string(), text, line, is_disabled }
+        // Check both generic ignore and rule-specific ignore (from inline comments)
+        let is_ignored_inline =
+            inline_config.is_ignored(loc) || inline_config.is_rule_ignored(loc, &kind);
+        // Check if rule is ignored in file config
+        let is_ignored_file_config = file_config.get_ignored_rules(file).contains(&kind);
+        let is_ignored = is_ignored_inline || is_ignored_file_config;
+        Self { kind, file: file.display().to_string(), text, line, is_disabled, is_ignored }
     }
 
     #[must_use]
@@ -74,11 +90,27 @@ impl InvalidItem {
             ValidatorKind::Directive => {
                 format!("Invalid directive in {}: {}", self.file, self.text)
             }
+            ValidatorKind::Variable => {
+                format!(
+                    "Invalid variable name in {} on line {}: {}",
+                    self.file, self.line, self.text
+                )
+            }
+            ValidatorKind::Error => {
+                format!("Invalid error name in {} on line {}: {}", self.file, self.line, self.text)
+            }
+            ValidatorKind::Eip712 => {
+                format!("Invalid EIP712 typehash in {}: {}", self.file, self.text)
+            }
+            ValidatorKind::Import => {
+                format!("Unused import in {} on line {}: {}", self.file, self.line, self.text)
+            }
         }
     }
 }
 
 /// Categories of file kinds found in forge projects.
+///
 /// Two additional file kinds are not included here: `ScriptHelpers` and `TestHelpers`. These are
 /// not currently used in any checks so they are excluded for now.
 pub enum FileKind {
@@ -88,21 +120,30 @@ pub enum FileKind {
     Src,
     /// Contracts with test methods live in the `test` directory and end with `.t.sol`.
     Test,
+    /// Contracts with handler methods live in the `test` directory and end with `.handler.sol`.
+    Handler,
 }
 
 /// Provides a method to check if a file is of a given kind.
 pub trait IsFileKind {
     /// Returns `true` if the file is of the given kind, `false` otherwise.
-    fn is_file_kind(&self, kind: FileKind) -> bool;
+    fn is_file_kind(&self, kind: FileKind, paths: &CheckPaths) -> bool;
 }
 
 impl IsFileKind for Path {
-    fn is_file_kind(&self, kind: FileKind) -> bool {
+    fn is_file_kind(&self, kind: FileKind, paths: &CheckPaths) -> bool {
         let path = self.to_str().unwrap();
         match kind {
-            FileKind::Script => path.starts_with("./script") && path.ends_with(".s.sol"),
-            FileKind::Src => path.starts_with("./src") && path.ends_with(".sol"),
-            FileKind::Test => path.starts_with("./test") && path.ends_with(".t.sol"),
+            FileKind::Script => {
+                path.starts_with(paths.script_path.as_str()) && path.ends_with(".s.sol")
+            }
+            FileKind::Src => path.starts_with(paths.src_path.as_str()) && path.ends_with(".sol"),
+            FileKind::Test => {
+                path.starts_with(paths.test_path.as_str()) && path.ends_with(".t.sol")
+            }
+            FileKind::Handler => {
+                path.starts_with(paths.test_path.as_str()) && path.ends_with(".handler.sol")
+            }
         }
     }
 }
@@ -164,7 +205,7 @@ pub fn offset_to_line(content: &str, start: usize) -> usize {
             line_counter += 1;
         }
         if offset > start {
-            return line_counter
+            return line_counter;
         }
     }
 
@@ -197,6 +238,8 @@ pub struct ExpectedFindings {
     pub test_helper: usize,
     /// The number of expected findings for test contracts.
     pub test: usize,
+    /// The number of expected findings for handler contracts.
+    pub handler: usize,
 }
 
 impl ExpectedFindings {
@@ -212,6 +255,7 @@ impl ExpectedFindings {
             src: expected_findings,
             test_helper: expected_findings,
             test: expected_findings,
+            handler: expected_findings,
         }
     }
 
@@ -221,6 +265,7 @@ impl ExpectedFindings {
     /// # Panics
     ///
     /// In practice this should not panic unless one of validations fails.
+    #[allow(clippy::too_many_lines)]
     pub fn assert_eq(&self, src: &str, validate: &dyn Fn(&Parsed) -> Vec<InvalidItem>) {
         /// Generates a `Parsed` struct from the given data.
         fn to_parsed(
@@ -238,10 +283,12 @@ impl ExpectedFindings {
                 comments,
                 inline_config,
                 invalid_inline_config_items,
+                file_config: crate::check::file_config::FileConfig::default(),
+                path_config: CheckPaths::default(),
             }
         }
         // Parse content.
-        let (pt, comments) = solang_parser::parse(src, 0).expect("Parsing failed");
+        let (pt, comments) = crate::parser::parse_solidity(src, 0).expect("Parsing failed");
         let comments = Comments::new(comments, src);
 
         // Create `Parsed` struct for each file path to test. We can clone `pt` and `comments`, but
@@ -300,6 +347,18 @@ impl ExpectedFindings {
         let invalid_items_test = validate(&to_parsed(
             "./test/MyContract.t.sol",
             src,
+            pt.clone(),
+            comments.clone(),
+            inline_config,
+            invalid_inline_config_items,
+        ));
+
+        let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
+            comments.parse_inline_config_items().partition_result();
+        let inline_config = InlineConfig::new(inline_config_items, src);
+        let invalid_items_handler = validate(&to_parsed(
+            "./test/MyContract.handler.sol",
+            src,
             pt,
             comments,
             inline_config,
@@ -307,10 +366,42 @@ impl ExpectedFindings {
         ));
 
         //  Execute tests.
-        assert_eq!(invalid_items_script_helper.len(), self.script_helper);
-        assert_eq!(invalid_items_script.len(), self.script);
-        assert_eq!(invalid_items_src.len(), self.src);
-        assert_eq!(invalid_items_test_helper.len(), self.test_helper);
-        assert_eq!(invalid_items_test.len(), self.test);
+        // Filter out ignored and disabled items (same as report does)
+        assert_eq!(
+            invalid_items_script_helper
+                .iter()
+                .filter(|item| !item.is_disabled && !item.is_ignored)
+                .count(),
+            self.script_helper
+        );
+        assert_eq!(
+            invalid_items_script
+                .iter()
+                .filter(|item| !item.is_disabled && !item.is_ignored)
+                .count(),
+            self.script
+        );
+        assert_eq!(
+            invalid_items_src.iter().filter(|item| !item.is_disabled && !item.is_ignored).count(),
+            self.src
+        );
+        assert_eq!(
+            invalid_items_test_helper
+                .iter()
+                .filter(|item| !item.is_disabled && !item.is_ignored)
+                .count(),
+            self.test_helper
+        );
+        assert_eq!(
+            invalid_items_test.iter().filter(|item| !item.is_disabled && !item.is_ignored).count(),
+            self.test
+        );
+        assert_eq!(
+            invalid_items_handler
+                .iter()
+                .filter(|item| !item.is_disabled && !item.is_ignored)
+                .count(),
+            self.handler
+        );
     }
 }

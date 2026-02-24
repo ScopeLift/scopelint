@@ -1,0 +1,17 @@
+# Use contracts/ instead of src/ (default Foundry allows both)
+[profile.default]
+src = "contracts"
+test = "test"
+script = "script"
+
+[fmt]
+  bracket_spacing = false
+  int_types = "long"
+  line_length = 100
+  multiline_func_header = "attributes_first"
+  number_underscore = "thousands"
+  override_spacing = false
+  quote_style = "double"
+  single_line_statement_blocks = "single"
+  tab_width = 2
+  wrap_comments = true

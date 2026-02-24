@@ -3,7 +3,10 @@
 // extensions manually with `ends_with`.
 #![allow(clippy::case_sensitive_file_extension_comparisons)]
 
-use crate::check::utils::{Name, VisibilitySummary};
+use crate::{
+    check::utils::{Name, VisibilitySummary},
+    foundry_config::CheckPaths,
+};
 use colored::Colorize;
 use solang_parser::pt::{
     ContractDefinition, ContractPart, ContractTy, FunctionDefinition, SourceUnitPart,
@@ -20,15 +23,16 @@ use walkdir::WalkDir;
 /// Returns an error if the specification could not be generated from the Solidity code.
 /// # Panics
 /// Panics when a file path could not be unwrapped.
-pub fn run() -> Result<(), Box<dyn Error>> {
+pub fn run(show_internal: bool) -> Result<(), Box<dyn Error>> {
     // =================================
     // ======== Parse contracts ========
     // =================================
 
     // First, parse all source and test files to collect the contracts and their methods. All free
     // functions are added under a special contract called `FreeFunctions`.
-    let src_contracts = get_contracts_for_dir("./src", ".sol");
-    let test_contracts = get_contracts_for_dir("./test", ".t.sol");
+    let path_config = CheckPaths::load();
+    let src_contracts = get_contracts_for_dir(&path_config.src_path, ".sol", show_internal);
+    let test_contracts = get_contracts_for_dir(&path_config.test_path, ".t.sol", show_internal);
 
     // ========================================
     // ======== Generate Specification ========
@@ -41,6 +45,11 @@ pub fn run() -> Result<(), Box<dyn Error>> {
     //     contract contains that source method's tests/specification.
     let mut protocol_spec = ProtocolSpecification::new();
     for src_contract in src_contracts {
+        // Skip contracts with no functions - they have nothing to specify
+        if src_contract.functions.is_empty() {
+            continue;
+        }
+
         let mut contract_specification = ContractSpecification::new(src_contract.clone());
         let src_contract_name = src_contract.contract.unwrap().name.unwrap().name;
 
@@ -67,15 +76,16 @@ struct ParsedContract {
 }
 
 impl ParsedContract {
-    fn new(path: PathBuf, contract: Option<ContractDefinition>) -> Self {
-        let functions = contract.as_ref().map_or(Vec::new(), get_functions_from_contract);
+    fn new(path: PathBuf, contract: Option<ContractDefinition>, show_internal: bool) -> Self {
+        let functions =
+            contract.as_ref().map_or(Vec::new(), |c| get_functions_from_contract(c, show_internal));
         Self { path, contract, functions }
     }
 
     fn contract_name(&self) -> String {
         self.contract
             .as_ref()
-            .map_or("FreeFunctions".to_string(), |c| c.name.as_ref().unwrap().name.clone())
+            .map_or_else(|| "FreeFunctions".to_string(), |c| c.name.as_ref().unwrap().name.clone())
     }
 
     fn contract_name_from_file(&self) -> String {
@@ -114,6 +124,7 @@ impl ContractSpecification {
         // which is the order we want to print in.
         let src_fns = &self.src_contract.functions;
         let num_src_fns = src_fns.len();
+
         for (i, src_fn) in src_fns.iter().enumerate() {
             let src_fn_name_prefix = if i == num_src_fns - 1 { "└── " } else { "├── " };
 
@@ -121,7 +132,7 @@ impl ContractSpecification {
                 .iter()
                 .find(|tc| {
                     // Find the test contract with the same name
-                    tc.contract_name().to_ascii_lowercase() == src_fn.name().to_ascii_lowercase()
+                    tc.contract_name().eq_ignore_ascii_case(&src_fn.name())
                 })
                 .map_or_else(
                     // If there's no matching test contract, print the name of the source function
@@ -138,7 +149,7 @@ impl ContractSpecification {
                             let is_test_fn =
                                 f.is_public_or_external() && f.name().starts_with("test");
                             if !is_test_fn {
-                                continue
+                                continue;
                             }
 
                             let test_fn_name_prefix =
@@ -195,31 +206,35 @@ impl ProtocolSpecification {
 // ======== Helper functions ========
 // ==================================
 
-fn get_contracts_for_dir<P: AsRef<Path>>(dir: P, extension: &str) -> Vec<ParsedContract> {
+fn get_contracts_for_dir<P: AsRef<Path>>(
+    dir: P,
+    extension: &str,
+    show_internal: bool,
+) -> Vec<ParsedContract> {
     let mut contracts: Vec<ParsedContract> = Vec::new();
     for result in WalkDir::new(dir) {
         let dent = match result {
             Ok(dent) => dent,
             Err(err) => {
                 eprintln!("{err}");
-                continue
+                continue;
             }
         };
 
         let file = dent.path();
         if !dent.file_type().is_file() || !dent.path().to_str().unwrap().ends_with(extension) {
-            continue
+            continue;
         }
 
-        let new_contracts = parse_contracts(file);
+        let new_contracts = parse_contracts(file, show_internal);
         contracts.extend(new_contracts);
     }
     contracts
 }
 
-fn parse_contracts(file: &Path) -> Vec<ParsedContract> {
+fn parse_contracts(file: &Path, show_internal: bool) -> Vec<ParsedContract> {
     let content = fs::read_to_string(file).unwrap();
-    let (pt, _comments) = solang_parser::parse(&content, 0).expect("Parsing failed");
+    let (pt, _comments) = crate::parser::parse_solidity(&content, 0).expect("Parsing failed");
     let mut contracts: Vec<ParsedContract> = Vec::new();
 
     for element in &pt.0 {
@@ -230,10 +245,14 @@ fn parse_contracts(file: &Path) -> Vec<ParsedContract> {
             }
             SourceUnitPart::ContractDefinition(c) => {
                 if let ContractTy::Interface(_) = c.ty {
-                    continue
+                    continue;
                 }
 
-                contracts.push(ParsedContract::new(file.to_path_buf(), Some(*c.clone())));
+                contracts.push(ParsedContract::new(
+                    file.to_path_buf(),
+                    Some(*c.clone()),
+                    show_internal,
+                ));
             }
             _ => (),
         }
@@ -241,11 +260,16 @@ fn parse_contracts(file: &Path) -> Vec<ParsedContract> {
     contracts
 }
 
-fn get_functions_from_contract(contract: &ContractDefinition) -> Vec<FunctionDefinition> {
+fn get_functions_from_contract(
+    contract: &ContractDefinition,
+    show_internal: bool,
+) -> Vec<FunctionDefinition> {
     let mut functions = Vec::new();
     for element in &contract.parts {
         if let ContractPart::FunctionDefinition(f) = element {
-            functions.push(*f.clone());
+            if show_internal || f.is_public_or_external() {
+                functions.push(*f.clone());
+            }
         }
     }
     functions

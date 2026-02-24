@@ -2,14 +2,13 @@ use crate::check::{
     utils::{InvalidItem, ValidatorKind},
     Parsed,
 };
-use once_cell::sync::Lazy;
 use regex::Regex;
 use solang_parser::pt::{ContractPart, SourceUnitPart, VariableAttribute, VariableDefinition};
-use std::path::Path;
+use std::{path::Path, sync::LazyLock};
 
 // A regex matching valid constant names, see the `validate_constant_names_regex` test for examples.
-static RE_VALID_CONSTANT_NAME: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(?:[$_]*[A-Z0-9][$_]*){1,}$").unwrap());
+static RE_VALID_CONSTANT_NAME: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(?:[$_]*[A-Z0-9][$_]*){1,}$").unwrap());
 
 const fn is_matching_file(_file: &Path) -> bool {
     true
@@ -19,7 +18,7 @@ const fn is_matching_file(_file: &Path) -> bool {
 /// Validates that constant and immutable variable names are in `ALL_CAPS`.
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
     if !is_matching_file(&parsed.file) {
-        return Vec::new()
+        return Vec::new();
     }
 
     let mut invalid_items: Vec<InvalidItem> = Vec::new();
@@ -56,7 +55,7 @@ fn validate_name(parsed: &Parsed, v: &VariableDefinition) -> Option<InvalidItem>
         .any(|a| matches!(a, VariableAttribute::Constant(_) | VariableAttribute::Immutable(_)));
 
     if !is_constant {
-        return None
+        return None;
     }
 
     v.name.as_ref().and_then(|name| {

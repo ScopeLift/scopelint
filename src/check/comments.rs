@@ -84,7 +84,7 @@ impl CommentWithMetadata {
     ) -> Self {
         let src_before = &src[..comment.loc().start()];
         if src_before.is_empty() {
-            return Self::new(comment, CommentPosition::Prefix, false, 0)
+            return Self::new(comment, CommentPosition::Prefix, false, 0);
         }
 
         let mut lines_before = src_before.lines().rev();
@@ -99,7 +99,7 @@ impl CommentWithMetadata {
                 CommentPosition::Prefix,
                 last_line.map_or(true, str::is_empty),
                 indent_len,
-            )
+            );
         }
 
         // TODO: this loop takes almost the entirety of the time spent in parsing, which is up to
@@ -378,7 +378,7 @@ impl<'a> Iterator for NonCommentChars<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         for (state, _, ch) in self.0.by_ref() {
             if state == CommentState::None {
-                return Some(ch)
+                return Some(ch);
             }
         }
         None
@@ -387,10 +387,10 @@ impl<'a> Iterator for NonCommentChars<'a> {
 
 /// Helpers for iterating over comment containing strings
 pub trait CommentStringExt {
-    fn comment_state_char_indices(&self) -> CommentStateCharIndices;
+    fn comment_state_char_indices(&self) -> CommentStateCharIndices<'_>;
 
     #[inline]
-    fn non_comment_chars(&self) -> NonCommentChars {
+    fn non_comment_chars(&self) -> NonCommentChars<'_> {
         NonCommentChars(self.comment_state_char_indices())
     }
 
@@ -405,14 +405,14 @@ where
     T: AsRef<str>,
 {
     #[inline]
-    fn comment_state_char_indices(&self) -> CommentStateCharIndices {
+    fn comment_state_char_indices(&self) -> CommentStateCharIndices<'_> {
         CommentStateCharIndices::new(self.as_ref())
     }
 }
 
 impl CommentStringExt for str {
     #[inline]
-    fn comment_state_char_indices(&self) -> CommentStateCharIndices {
+    fn comment_state_char_indices(&self) -> CommentStateCharIndices<'_> {
         CommentStateCharIndices::new(self)
     }
 }
