@@ -136,6 +136,13 @@ The project includes integration tests that run the binary against sample projec
 - `tests/check.rs`: Tests the `check` command
 - `tests/spec.rs`: Tests the `spec` command
 
+#### scopelintup
+To test the version manager (install, shim, version resolution, error handling) in an isolated temp dir:
+
+```bash
+./scopelintup/test-scopelintup.sh
+```
+
 #### Test Projects
 Sample projects in `tests/` are used for integration testing:
 - `check-proj1-AllFindings/`: Project with known validation issues

@@ -13,6 +13,30 @@ A simple and opinionated tool designed for basic formatting/linting of Solidity 
 
 ## Installation
 
+### Recommended: `scopelintup`
+
+Install `scopelintup`, the scopelint version manager, to manage versions automatically per-project:
+
+```bash
+curl -L https://raw.githubusercontent.com/ScopeLift/scopelint/main/scopelintup/install | bash
+```
+
+Then install the latest version of scopelint:
+
+```bash
+scopelintup
+```
+
+Or install a specific version:
+
+```bash
+scopelintup --version v0.1.0
+```
+
+Projects can pin a version by adding a `.scopelint-version` file (e.g. containing `v0.1.0`). When a pinned version is present, the `scopelint` command automatically uses the correct binary.
+
+### Alternative: `cargo install`
+
 When using the [ScopeLift Foundry template](https://github.com/ScopeLift/foundry-template/) scopelint will automatically be ran in CI. To run locally:
 
 1. Install the [rust toolchain](https://www.rust-lang.org/tools/install)
