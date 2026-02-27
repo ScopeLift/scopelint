@@ -19,6 +19,7 @@ fn is_matching_file(parsed: &Parsed) -> bool {
 /// - Storage variables should NOT have an underscore prefix
 /// - Non-storage variables (local variables, parameters) should have an underscore prefix
 /// - Variables that reference storage/storages should NOT have an underscore prefix
+/// - Transient storage variables should be prefixed with `t_` (e.g. `t_reentrancyFlag`)
 pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
     if !is_matching_file(parsed) {
         return Vec::new();
@@ -90,7 +91,20 @@ fn validate_function(parsed: &Parsed, f: &FunctionDefinition) -> Vec<InvalidItem
 fn validate_state_variable(parsed: &Parsed, v: &VariableDefinition) -> Option<InvalidItem> {
     v.name.as_ref().and_then(|name| {
         let name_str = &name.name;
-        if is_valid_state_variable_name(name_str) {
+        let is_transient = is_transient_state_variable(&parsed.src, name.loc);
+
+        if is_transient {
+            if name_str.starts_with("t_") {
+                None
+            } else {
+                Some(InvalidItem::new(
+                    ValidatorKind::Variable,
+                    parsed,
+                    name.loc,
+                    format!("Transient state variable '{name_str}' should be prefixed with 't_'"),
+                ))
+            }
+        } else if is_valid_state_variable_name(name_str) {
             None
         } else {
             Some(InvalidItem::new(
@@ -181,6 +195,28 @@ fn is_valid_parameter_name(name: &str, is_storage: bool) -> bool {
 fn is_valid_state_variable_name(name: &str) -> bool {
     // State variables should NOT have underscore prefix
     !name.starts_with('_')
+}
+
+/// Detects whether a state variable declaration uses the `transient` keyword by scanning the
+/// original source around the variable name location.
+fn is_transient_state_variable(src: &str, name_loc: solang_parser::pt::Loc) -> bool {
+    let start = name_loc.start();
+    if start >= src.len() {
+        return false;
+    }
+
+    // Take a slice from the previous newline (or start of file) up to the next `;`.
+    let decl_start = src[..start].rfind('\n').map_or(0, |idx| idx + 1);
+    let rest = &src[start..];
+    let rel_end = rest.find(';').unwrap_or(rest.len());
+    let decl_end = start.saturating_add(rel_end).min(src.len());
+
+    if decl_start >= decl_end {
+        return false;
+    }
+
+    let snippet = &src[decl_start..decl_end];
+    snippet.split_whitespace().any(|tok| tok == "transient")
 }
 
 fn is_valid_local_variable_name(name: &str, is_storage: bool) -> bool {
@@ -308,6 +344,36 @@ mod tests {
                 function invalidFunction() external {
                     Deposit storage _deposit = deposits[0];
                 }
+            }
+        ";
+
+        let expected_findings = ExpectedFindings {
+            src: 1,
+            test: 1,
+            handler: 1,
+            script: 1,
+            ..ExpectedFindings::default()
+        };
+        expected_findings.assert_eq(content, &validate);
+    }
+
+    #[test]
+    fn test_transient_state_variable_with_correct_prefix() {
+        let content = r"
+            contract MyContract {
+                uint128 transient t_reentrancyFlag;
+            }
+        ";
+
+        let expected_findings = ExpectedFindings::new(0);
+        expected_findings.assert_eq(content, &validate);
+    }
+
+    #[test]
+    fn test_transient_state_variable_without_prefix() {
+        let content = r"
+            contract MyContract {
+                uint128 transient reentrancyFlag;
             }
         ";
 
