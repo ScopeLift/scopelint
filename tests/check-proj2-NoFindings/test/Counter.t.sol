@@ -7,7 +7,7 @@ contract CounterTest is Test {
   uint256 constant TEST_VAL = 123;
 
   Counter public counter;
-  uint128 transient transientVar;
+  uint128 transient t_reentrancyFlag;
 
   function setUp() public {
     counter = new Counter();
