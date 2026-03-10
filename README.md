@@ -9,6 +9,7 @@ A simple and opinionated tool designed for basic formatting/linting of Solidity 
     - [`scopelint check`](#scopelint-check)
     - [`scopelint fix`](#scopelint-fix)
     - [`scopelint spec`](#scopelint-spec)
+  - [Claude Code plugin](#claude-code-plugin)
   - [Development](#development)
 
 ## Installation
@@ -124,6 +125,38 @@ Currently this feature is in beta, and we are looking for feedback on how to imp
 Right now it's focused on specifications for unit tests, which are very useful for developers but less useful for higher-level stakeholders.
 As a result, it does not yet include information about protocol invariants or integration test / user-story types of specifications.
 If you have any thoughts or ideas, please open an issue [here](https://github.com/ScopeLift/scopelint/issues/new).
+
+## Claude Code plugin
+
+`ScopeLint` ships as a [Claude Code](https://code.claude.com) plugin so you can run lint workflows and structure reviews from inside Claude. The plugin adds two skills:
+
+| Skill | What it does |
+|-------|----------------|
+| **lint** | Runs `scopelint check`, lists findings in priority order, and can fix them (or ask you). By default offers to address all findings. |
+| **review** | Reviews your Foundry/Solidity project for structure and quality using ScopeLint’s conventions, and explains the “why” behind each finding. |
+
+### Install the plugin
+
+In [Claude Code](https://code.claude.com), run:
+
+1. **Add the marketplace** (this repo):
+   ```text
+   /plugin marketplace add ScopeLift/scopelint
+   ```
+
+2. **Install the plugin**:
+   ```text
+   /plugin install scopelint@scopelint
+   ```
+
+3. Restart Claude Code if prompted. Run `/help` to see the skills under the `scopelint` namespace.
+
+### Use the skills
+
+- **Lint and fix**: Run `/scopelint:lint` or ask in natural language, e.g. *“Run scopelint and fix the findings”* or *“Lint this project and list issues by priority.”*
+- **Structure review**: Run `/scopelint:review` or ask e.g. *“Review this Solidity project’s structure and quality.”*
+
+Claude can also use these skills automatically when you talk about linting, fixing conventions, or code/structure review in a Foundry project. You need `ScopeLint` installed locally (`cargo install scopelint`) and a Foundry layout (`src/`, `test/`, `script/`).
 
 ## Development
 
