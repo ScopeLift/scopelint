@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ScopeLint – Opinionated linting for Foundry projects</title>
+    <meta
+      name="description"
+      content="ScopeLint is a simple, opinionated linter and formatter for Solidity and TOML in Foundry projects. Catch naming, layout, and configuration issues early with a CLI that fits into your workflow."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <a href="#hero" class="logo">ScopeLint</a>
+        <div class="header-right">
+          <button
+            type="button"
+            class="theme-toggle"
+            id="theme-toggle"
+            aria-label="Toggle color scheme"
+          >
+            <span class="theme-toggle-label">Dark</span> mode
+          </button>
+          <nav class="nav">
+            <a href="#why">Why</a>
+            <a href="#features">Features</a>
+            <a href="#usage">Usage</a>
+            <a href="#examples">Examples</a>
+            <a href="#ci">CI</a>
+            <a href="#faq">FAQ</a>
+            <a
+              href="https://github.com/ScopeLift/scopelint"
+              target="_blank"
+              rel="noreferrer"
+              class="nav-cta"
+              >GitHub</a
+            >
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section id="hero" class="hero">
+        <div class="container hero-inner">
+          <div class="hero-copy">
+            <p class="eyebrow">Static analysis for Foundry projects</p>
+            <h1>Opinionated linting for Solidity and TOML.</h1>
+            <p class="hero-subtitle">
+              ScopeLint is a simple and opinionated tool designed for basic
+              formatting and linting of Solidity and TOML code in Foundry projects.
+              It runs as a lightweight CLI that formats your project and enforces
+              naming and layout conventions so tests, scripts, and specs stay clean
+              as your codebase grows.
+            </p>
+            <div class="hero-actions">
+              <a href="#usage" class="btn primary">Get started</a>
+              <a
+                href="https://github.com/ScopeLift/scopelint"
+                target="_blank"
+                rel="noreferrer"
+                class="btn secondary"
+                >View on GitHub</a
+              >
+            </div>
+            <p class="hero-footnote">
+              Works with existing
+              <code>foundry.toml</code> layouts. No custom config required.
+            </p>
+          </div>
+
+          <aside class="hero-panel">
+            <div class="panel-header">
+              <span class="dot red"></span>
+              <span class="dot amber"></span>
+              <span class="dot green"></span>
+              <span class="panel-title">scopelint check</span>
+            </div>
+            <pre class="code-block small"><code>$ scopelint check
+
+✓ test names follow best practices
+✓ constants are ALL_CAPS
+✓ scripts expose a single public run()
+
+⚠ src/Counter.sol
+  - internal function name should start with "_" (src)
+
+⚠ script/Deploy.s.sol
+  - multiple public run methods, only one is allowed (script)
+</code></pre>
+          </aside>
+        </div>
+      </section>
+
+      <section id="why" class="section">
+        <div class="container">
+          <h2>Why ScopeLint?</h2>
+          <p class="section-intro">
+            Foundry gives you great primitives, but it is still easy for projects
+            to drift into inconsistent naming, test layouts, and scripts that are
+            hard to reason about. ScopeLint keeps the basics sharp so you can focus
+            on protocol logic.
+          </p>
+          <div class="grid">
+            <article class="card">
+              <h3>Solidity-aware checks</h3>
+              <p>
+                ScopeLint understands common patterns in Foundry projects: tests,
+                scripts, and sources. Rules are tailored to Solidity codebases
+                instead of generic linting heuristics.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Conventions over config</h3>
+              <p>
+                No giant rule matrices. ScopeLint encodes a small set of
+                opinionated practices—like test naming and internal function
+                prefixes—so teams can converge on a shared style quickly.
+              </p>
+            </article>
+            <article class="card">
+              <h3>Fits your workflow</h3>
+              <p>
+                Run it locally via the CLI or wire it into CI. It uses the same
+                paths and profiles as Forge by reading your existing
+                <code>foundry.toml</code>.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="section alt">
+        <div class="container">
+          <h2>Key capabilities</h2>
+          <div class="grid grid-2">
+            <article class="feature">
+              <h3><code>scopelint fmt</code></h3>
+              <p>
+                Formats Solidity files using your Foundry configuration and
+                pretty‑prints TOML with indented, alphabetically sorted keys for
+                better readability.
+              </p>
+            </article>
+            <article class="feature">
+              <h3><code>scopelint check</code></h3>
+              <p>
+                Validates test naming, constants, script entrypoints, internal
+                function prefixes, and more to ensure best practices are applied
+                consistently across the project.
+              </p>
+            </article>
+            <article class="feature">
+              <h3><code>scopelint fix</code></h3>
+              <p>
+                Applies safe automatic fixes, like removing unused imports, and
+                then runs <code>scopelint check</code> so you see what still needs
+                attention.
+              </p>
+            </article>
+            <article class="feature">
+              <h3><code>scopelint spec</code></h3>
+              <p>
+                Treats your tests as the spec for your contracts. Generates a
+                human‑readable specification based on your test layout and naming,
+                so stakeholders can quickly grasp intended behavior.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="usage" class="section">
+        <div class="container">
+          <h2>Install &amp; basic usage</h2>
+          <div class="grid grid-2">
+            <div>
+              <h3>Install with Cargo</h3>
+              <ol class="list">
+                <li>Install the Rust toolchain if you don’t have it yet.</li>
+                <li>Install ScopeLint from crates.io:</li>
+              </ol>
+              <pre class="code-block"><code>cargo install scopelint</code></pre>
+              <p>
+                Once installed, you can run it from the root of your Foundry
+                project. It reads <code>foundry.toml</code> paths the same way
+                Forge does.
+              </p>
+            </div>
+            <div>
+              <h3>Run the commands</h3>
+              <pre class="code-block"><code># Format Solidity and TOML
+scopelint fmt
+
+# Check conventions and report findings
+scopelint check
+
+# Apply safe automatic fixes, then re-check
+scopelint fix
+
+# Generate a human-readable specification from tests
+scopelint spec</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="examples" class="section alt">
+        <div class="container">
+          <h2>Examples of findings</h2>
+          <p class="section-intro">
+            ScopeLint focuses on issues that make Solidity projects harder to
+            understand and maintain, not just stylistic nits. Here are a few
+            example checks.
+          </p>
+          <div class="grid">
+            <article class="card">
+              <h3>Test naming conventions</h3>
+              <pre class="code-block small"><code>// test/Counter.t.sol
+
+function testCounter() public { ... }     // ❌ too vague
+function test_RevertIf_Zero() public { }  // ✅ matches convention
+</code></pre>
+              <p class="card-footnote">
+                ScopeLint validates that test names follow a convention based on
+                Foundry best practices so your test suite reads like a spec.
+              </p>
+            </article>
+
+            <article class="card">
+              <h3>Constants &amp; immutables</h3>
+              <pre class="code-block small"><code>// src/Token.sol
+
+uint256 maxSupply = 1_000_000;          // ❌ should be ALL_CAPS
+uint256 public constant MAX_SUPPLY = 1_000_000; // ✅
+</code></pre>
+              <p class="card-footnote">
+                Constants and immutables are expected to be in
+                <code>ALL_CAPS</code>, making them easy to scan in larger
+                contracts.
+              </p>
+            </article>
+
+            <article class="card">
+              <h3>Script entrypoints</h3>
+              <pre class="code-block small"><code>// script/Deploy.s.sol
+
+contract Deploy is Script {
+    function run() public { ... }
+    function runGoerli() public { ... } // ❌ only one public run allowed
+}
+</code></pre>
+              <p class="card-footnote">
+                Forge scripts should expose a single public
+                <code>run</code> entrypoint. ScopeLint flags scripts that define
+                more than one.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="ci" class="section">
+        <div class="container">
+          <h2>CI &amp; workflow integration</h2>
+          <div class="grid grid-2">
+            <div>
+              <p>
+                ScopeLint is just a CLI, so it drops cleanly into any CI system
+                that can run a few shell commands. A typical GitHub Actions
+                workflow installs the Rust toolchain, installs ScopeLint, and runs
+                checks against your Foundry project.
+              </p>
+              <p>
+                You can also use it in pre‑commit hooks or as part of a local
+                formatting script to keep branches clean before they ever reach CI.
+              </p>
+            </div>
+            <div>
+              <h3>GitHub Actions example</h3>
+              <pre class="code-block"><code>name: scopelint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  scopelint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install ScopeLint
+        run: cargo install scopelint
+      - name: Run ScopeLint
+        run: |
+          scopelint fmt --check
+          scopelint check
+</code></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="faq" class="section alt">
+        <div class="container">
+          <h2>FAQ</h2>
+          <div class="faq-list">
+            <details>
+              <summary>What is ScopeLint?</summary>
+              <p>
+                ScopeLint is a small, opinionated command-line tool for formatting
+                and linting Solidity and TOML in Foundry projects. Install it with
+                <code>cargo install scopelint</code> and run
+                <code>scopelint fmt</code>, <code>scopelint check</code>, or
+                <code>scopelint fix</code> from the root of your project.
+              </p>
+            </details>
+            <details>
+              <summary>What does ScopeLint check for?</summary>
+              <p>
+                ScopeLint focuses on a small set of high‑leverage rules:
+                conventions for test names, constants, script entrypoints,
+                internal/private function prefixes, unused imports, and certain
+                project layout patterns. More rules are planned over time.
+              </p>
+            </details>
+            <details>
+              <summary>Does it modify my files?</summary>
+              <p>
+                <code>scopelint check</code> is read‑only and only reports
+                findings. <code>scopelint fmt</code> and
+                <code>scopelint fix</code> will modify files, but only in ways
+                designed to be safe and predictable (formatting and specific
+                automated fixes).
+              </p>
+            </details>
+            <details>
+              <summary>How does it find my source, test, and script paths?</summary>
+              <p>
+                ScopeLint reads <code>foundry.toml</code> the same way Forge
+                does. It uses <code>[profile.default]</code> (or root-level)
+                <code>src</code>, <code>test</code>, and <code>script</code>
+                settings, with optional overrides via an extra
+                <code>[check]</code> section.
+              </p>
+            </details>
+            <details>
+              <summary>Can I ignore specific rules or files?</summary>
+              <p>
+                Yes. You can add inline <code>// scopelint: ...</code> comments in
+                Solidity files or configure a <code>.scopelint</code> file in your
+                project root to ignore specific files or rules. See the GitHub
+                README for concrete examples.
+              </p>
+            </details>
+            <details>
+              <summary>Where can I ask questions or request new checks?</summary>
+              <p>
+                Open an issue on the
+                <a
+                  href="https://github.com/ScopeLift/scopelint/issues"
+                  target="_blank"
+                  rel="noreferrer"
+                  >GitHub repository</a
+                >
+                with as much context as you can share. Real‑world examples are
+                especially helpful.
+              </p>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <p class="footer-brand">ScopeLint</p>
+        <p class="footer-meta">
+          Built by
+          <a
+            href="https://github.com/ScopeLift"
+            target="_blank"
+            rel="noreferrer"
+            >ScopeLift</a
+          >.
+        </p>
+        <div class="footer-links">
+          <a
+            href="https://github.com/ScopeLift/scopelint"
+            target="_blank"
+            rel="noreferrer"
+            >GitHub</a
+          >
+          <a
+            href="https://github.com/ScopeLift/scopelint/issues"
+            target="_blank"
+            rel="noreferrer"
+            >Issues</a
+          >
+        </div>
+      </div>
+    </footer>
+
+    <script src="./main.js"></script>
+  </body>
+</html>
+
