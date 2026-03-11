@@ -23,13 +23,11 @@ pub fn validate(parsed: &Parsed) -> Vec<InvalidItem> {
                     invalid_items.push(invalid_item);
                 }
             }
-            SourceUnitPart::ContractDefinition(c) => {
-                if !matches!(c.ty, ContractTy::Library(_)) {
-                    for el in &c.parts {
-                        if let ContractPart::FunctionDefinition(f) = el {
-                            if let Some(invalid_item) = validate_name(parsed, f) {
-                                invalid_items.push(invalid_item);
-                            }
+            SourceUnitPart::ContractDefinition(c) if !matches!(c.ty, ContractTy::Library(_)) => {
+                for el in &c.parts {
+                    if let ContractPart::FunctionDefinition(f) = el {
+                        if let Some(invalid_item) = validate_name(parsed, f) {
+                            invalid_items.push(invalid_item);
                         }
                     }
                 }
