@@ -195,21 +195,20 @@ impl VisibilitySummary for FunctionDefinition {
 }
 
 #[must_use]
-/// Converts the start offset of a `Loc` to `(line, col)`. Modified from <https://github.com/foundry-rs/foundry/blob/45b9dccdc8584fb5fbf55eb190a880d4e3b0753f/fmt/src/helpers.rs#L54-L70>
+/// Converts the start byte offset of a `Loc` to a 1-based line number.
+/// Uses `char_indices()` so that `start` (byte offset) is compared correctly for UTF-8 content.
 pub fn offset_to_line(content: &str, start: usize) -> usize {
-    debug_assert!(content.len() > start);
-
     let mut line_counter = 1; // First line is `1`.
-    for (offset, c) in content.chars().enumerate() {
+    for (byte_offset, c) in content.char_indices() {
         if c == '\n' {
             line_counter += 1;
         }
-        if offset > start {
+        if byte_offset > start {
             return line_counter;
         }
     }
-
-    unreachable!("content.len() > start")
+    // start is at or past end of content (e.g. empty file or parser edge case)
+    line_counter
 }
 
 // ===========================
