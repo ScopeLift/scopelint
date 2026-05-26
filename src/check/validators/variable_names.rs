@@ -8,10 +8,10 @@ use solang_parser::pt::{
 };
 fn is_matching_file(parsed: &Parsed) -> bool {
     let file = &parsed.file;
-    file.is_file_kind(FileKind::Src, &parsed.path_config)
-        || file.is_file_kind(FileKind::Test, &parsed.path_config)
-        || file.is_file_kind(FileKind::Handler, &parsed.path_config)
-        || file.is_file_kind(FileKind::Script, &parsed.path_config)
+    file.is_file_kind(FileKind::Src, &parsed.path_config) ||
+        file.is_file_kind(FileKind::Test, &parsed.path_config) ||
+        file.is_file_kind(FileKind::Handler, &parsed.path_config) ||
+        file.is_file_kind(FileKind::Script, &parsed.path_config)
 }
 
 #[must_use]
@@ -298,9 +298,9 @@ fn contains_keyword_before_name(src: &str, start: usize, end: usize, keyword: &s
     while idx < end {
         match state {
             ScanState::Code => {
-                if idx + keyword.len() <= end
-                    && &bytes[idx..idx + keyword.len()] == keyword
-                    && is_keyword_boundary(bytes, start, idx, idx + keyword.len(), end)
+                if idx + keyword.len() <= end &&
+                    &bytes[idx..idx + keyword.len()] == keyword &&
+                    is_keyword_boundary(bytes, start, idx, idx + keyword.len(), end)
                 {
                     return true;
                 }
