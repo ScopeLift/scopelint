@@ -15,7 +15,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: stable
           override: true
       - run: cargo --version --verbose
       - run: cargo build --release --all-features
@@ -27,7 +27,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: stable
           override: true
       - uses: foundry-rs/foundry-toolchain@v1
       - run: cargo test --locked --all-features
@@ -39,7 +39,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: stable
           override: true
           components: rustfmt
 
@@ -51,8 +51,6 @@ jobs:
 
       - name: cargo doc
         uses: actions-rs/cargo@v1
-        env:
-          RUSTDOCFLAGS: "-D rustdoc::missing_doc_code_examples"
         with:
           command: doc
           args: --workspace --all-features --no-deps --document-private-items
