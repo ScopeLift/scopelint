@@ -132,9 +132,9 @@ fn is_symbol_used_excluding_imports(
 
         // Check if the line is a comment (starts with // or contains /* before the match)
         let line_before_match = &line[..(match_start - line_start).min(line.len())];
-        let is_in_comment = line.trim_start().starts_with("//") ||
-            line_before_match.contains("/*") ||
-            line_before_match.contains("//");
+        let is_in_comment = line.trim_start().starts_with("//")
+            || line_before_match.contains("/*")
+            || line_before_match.contains("//");
 
         // If we found a match outside import statements and comments, the symbol is used
         if !is_in_comment {

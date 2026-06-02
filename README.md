@@ -18,6 +18,8 @@ When using the [ScopeLift Foundry template](https://github.com/ScopeLift/foundry
 1. Install the [rust toolchain](https://www.rust-lang.org/tools/install)
 2. Run `cargo install scopelint`
 
+If you prefer a more visual overview with examples and CI snippets, you can also browse the static site under [`docs/`](./docs), which is designed to be served via GitHub Pages.
+
 ## Usage
 
 Once installed there are four commands:

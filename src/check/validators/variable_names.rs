@@ -8,10 +8,10 @@ use solang_parser::pt::{
 };
 fn is_matching_file(parsed: &Parsed) -> bool {
     let file = &parsed.file;
-    file.is_file_kind(FileKind::Src, &parsed.path_config) ||
-        file.is_file_kind(FileKind::Test, &parsed.path_config) ||
-        file.is_file_kind(FileKind::Handler, &parsed.path_config) ||
-        file.is_file_kind(FileKind::Script, &parsed.path_config)
+    file.is_file_kind(FileKind::Src, &parsed.path_config)
+        || file.is_file_kind(FileKind::Test, &parsed.path_config)
+        || file.is_file_kind(FileKind::Handler, &parsed.path_config)
+        || file.is_file_kind(FileKind::Script, &parsed.path_config)
 }
 
 #[must_use]
@@ -58,15 +58,13 @@ fn validate_function(parsed: &Parsed, f: &FunctionDefinition) -> Vec<InvalidItem
     for (_, param) in &f.params {
         if let Some(p) = param {
             if let Some(name) = &p.name {
+                let name_str = &name.name;
                 let is_storage = is_storage_parameter(p);
-                if !is_valid_parameter_name(&name.name, is_storage) {
+                if !is_valid_parameter_name(name_str, is_storage) {
                     let message = if is_storage {
-                        format!(
-                            "Storage parameter '{}' should NOT have underscore prefix",
-                            &name.name
-                        )
+                        format!("Storage parameter '{name_str}' should NOT have underscore prefix")
                     } else {
-                        format!("Parameter '{}' should have underscore prefix", &name.name)
+                        format!("Parameter '{name_str}' should have underscore prefix")
                     };
                     invalid_items.push(InvalidItem::new(
                         ValidatorKind::Variable,
@@ -116,11 +114,12 @@ fn validate_statement(parsed: &Parsed, stmt: &Statement) -> Vec<InvalidItem> {
             let is_storage =
                 matches!(storage, Some(solang_parser::pt::StorageLocation::Storage(_)));
 
-            if !is_valid_local_variable_name(&name.name, is_storage) {
+            let name_str = &name.name;
+            if !is_valid_local_variable_name(name_str, is_storage) {
                 let message = if is_storage {
-                    format!("Storage variable '{}' should NOT have underscore prefix", &name.name)
+                    format!("Storage variable '{name_str}' should NOT have underscore prefix")
                 } else {
-                    format!("Local variable '{}' should have underscore prefix", &name.name)
+                    format!("Local variable '{name_str}' should have underscore prefix")
                 };
                 invalid_items.push(InvalidItem::new(
                     ValidatorKind::Variable,

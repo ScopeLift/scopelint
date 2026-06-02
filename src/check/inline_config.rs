@@ -194,8 +194,9 @@ impl IgnoredRange {
 }
 
 /// This is a list of Inline Config items for locations in a source file. This is acquired by
-/// parsing the comments for `scopelint:` items. See [`Comments::parse_inline_config_items`] for
-/// details.
+/// parsing the comments for `scopelint:` items. See
+/// [`Comments::parse_inline_config_items`](crate::check::comments::Comments::parse_inline_config_items)
+/// for details.
 #[derive(Default, Debug)]
 pub struct InlineConfig {
     disabled_ranges: Vec<DisabledRange>,
@@ -415,8 +416,8 @@ impl InlineConfig {
                             let end_offset = loc.end();
                             let mut next_newline =
                                 src[end_offset..].char_indices().skip_while(|(_, ch)| *ch != '\n');
-                            let end = end_offset +
-                                next_newline.next().map(|(idx, _)| idx).unwrap_or_default();
+                            let end = end_offset
+                                + next_newline.next().map(|(idx, _)| idx).unwrap_or_default();
 
                             ranges.push(IgnoredRange { start, end, loose: false });
                         }
