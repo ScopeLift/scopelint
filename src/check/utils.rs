@@ -196,19 +196,14 @@ impl VisibilitySummary for FunctionDefinition {
 
 #[must_use]
 /// Converts the start byte offset of a `Loc` to a 1-based line number.
-/// Uses `char_indices()` so that `start` (byte offset) is compared correctly for UTF-8 content.
+///
+/// The line number is one more than the number of newlines strictly before `start`. Offsets at or
+/// past the end of `content` resolve to the last line. Counting bytes is UTF-8 safe because a
+/// multi-byte character never contains `\n`.
+#[allow(clippy::naive_bytecount)] // A dependency just for faster newline counting isn't worth it.
 pub fn offset_to_line(content: &str, start: usize) -> usize {
-    let mut line_counter = 1; // First line is `1`.
-    for (byte_offset, c) in content.char_indices() {
-        if c == '\n' {
-            line_counter += 1;
-        }
-        if byte_offset > start {
-            return line_counter;
-        }
-    }
-    // start is at or past end of content (e.g. empty file or parser edge case)
-    line_counter
+    let end = start.min(content.len());
+    content.as_bytes()[..end].iter().filter(|&&b| b == b'\n').count() + 1
 }
 
 // ===========================
@@ -402,5 +397,42 @@ impl ExpectedFindings {
                 .count(),
             self.handler
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_offset_to_line_ascii() {
+        let content = "line one\nline two\nline three\n";
+        assert_eq!(offset_to_line(content, 0), 1);
+        assert_eq!(offset_to_line(content, content.find("two").unwrap()), 2);
+        assert_eq!(offset_to_line(content, content.find("three").unwrap()), 3);
+    }
+
+    #[test]
+    fn test_offset_to_line_multibyte_before_offset() {
+        // Byte offsets diverge from char indices after the emoji: the target is on line 2, but
+        // comparing char indices against the byte offset walked past it and reported line 5.
+        let content = "// 🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀\ntarget\npad1\npad2\npad3 pad3 pad3 pad3 pad3\n";
+        assert_eq!(offset_to_line(content, content.find("target").unwrap()), 2);
+    }
+
+    #[test]
+    fn test_offset_to_line_offset_beyond_char_count() {
+        // A byte offset larger than the file's total char count previously exhausted the loop
+        // and hit `unreachable!`.
+        let content = "// 🚀🚀🚀🚀🚀🚀🚀🚀🚀🚀\nx\n";
+        let start = content.find('x').unwrap();
+        assert!(start > content.chars().count());
+        assert_eq!(offset_to_line(content, start), 2);
+    }
+
+    #[test]
+    fn test_offset_to_line_offset_at_or_past_eof() {
+        let content = "a\nb";
+        assert_eq!(offset_to_line(content, content.len()), 2);
     }
 }
