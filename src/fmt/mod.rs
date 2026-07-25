@@ -83,9 +83,8 @@ fn check_formatting(taplo_opts: taplo::formatter::Options) -> Result<(), Box<dyn
     if has_changes {
         println!("\nRun 'scopelint fmt' to apply these changes.");
         process::exit(1);
-    } else {
-        println!("All files are properly formatted!");
     }
+    println!("All files are properly formatted!");
 
     Ok(())
 }

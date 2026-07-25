@@ -63,10 +63,10 @@ fn validate_function(parsed: &Parsed, f: &FunctionDefinition) -> Vec<InvalidItem
                     let message = if is_storage {
                         format!(
                             "Storage parameter '{}' should NOT have underscore prefix",
-                            &name.name
+                            name.name
                         )
                     } else {
-                        format!("Parameter '{}' should have underscore prefix", &name.name)
+                        format!("Parameter '{}' should have underscore prefix", name.name)
                     };
                     invalid_items.push(InvalidItem::new(
                         ValidatorKind::Variable,
@@ -118,9 +118,9 @@ fn validate_statement(parsed: &Parsed, stmt: &Statement) -> Vec<InvalidItem> {
 
             if !is_valid_local_variable_name(&name.name, is_storage) {
                 let message = if is_storage {
-                    format!("Storage variable '{}' should NOT have underscore prefix", &name.name)
+                    format!("Storage variable '{}' should NOT have underscore prefix", name.name)
                 } else {
-                    format!("Local variable '{}' should have underscore prefix", &name.name)
+                    format!("Local variable '{}' should have underscore prefix", name.name)
                 };
                 invalid_items.push(InvalidItem::new(
                     ValidatorKind::Variable,
