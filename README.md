@@ -45,6 +45,7 @@ This command ensures that development [best practices](https://book.getfoundry.s
 
 - Test names follow a convention of `^test(Fork)?(Fuzz)?(_Revert(If|When|On))?_(\w+)*$`. (To see a list of example valid test names, see [here](https://github.com/ScopeLift/scopelint/blob/1857e3940bfe92ac5a136827374f4b27ff083971/src/check/validators/test_names.rs#L106-L127)).
 - Constants and immutables are in `ALL_CAPS`.
+- Transient storage variables are prefixed with `t_` (e.g. `t_reentrancyFlag`).
 - Function names and visibility in forge scripts only have 1 public `run` method per script.
 - Internal or private functions in the source directory start with a leading underscore.
 
