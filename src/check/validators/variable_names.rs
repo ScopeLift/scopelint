@@ -365,7 +365,7 @@ fn contains_keyword_before_name(src: &str, start: usize, end: usize, keyword: &s
     false
 }
 
-fn is_keyword_boundary(
+const fn is_keyword_boundary(
     bytes: &[u8],
     search_start: usize,
     keyword_start: usize,
