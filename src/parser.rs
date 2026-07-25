@@ -8,6 +8,9 @@ use std::sync::LazyLock;
 static TRANSIENT_KEYWORD: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\btransient\b").expect("transient regex is valid"));
 const TRANSIENT_REPLACEMENT: &str = "         ";
+// Replacement must be the same length as the keyword so all byte offsets (line numbers,
+// comment and inline-config locations) remain valid against the original source.
+const _: () = assert!(TRANSIENT_REPLACEMENT.len() == "transient".len());
 
 /// Parses Solidity source code, with a fallback that strips unsupported keywords (e.g.
 /// `transient`).
