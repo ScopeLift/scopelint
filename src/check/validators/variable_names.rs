@@ -562,6 +562,31 @@ mod tests {
     }
 
     #[test]
+    fn test_transient_state_variable_ignored_with_rule_directive() {
+        let content = r"
+            contract MyContract {
+                // scopelint: ignore-variable-next-line
+                uint128 transient reentrancyFlag;
+            }
+        ";
+
+        let expected_findings = ExpectedFindings::new(0);
+        expected_findings.assert_eq(content, &validate);
+    }
+
+    #[test]
+    fn test_transient_state_variable_ignored_with_ignore_line() {
+        let content = r"
+            contract MyContract {
+                uint128 transient reentrancyFlag; // scopelint: ignore-line
+            }
+        ";
+
+        let expected_findings = ExpectedFindings::new(0);
+        expected_findings.assert_eq(content, &validate);
+    }
+
+    #[test]
     fn test_comment_text_does_not_mark_state_variable_transient() {
         let content = r"
             contract MyContract {
