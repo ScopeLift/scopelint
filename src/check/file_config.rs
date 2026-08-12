@@ -241,6 +241,6 @@ files = ["src/legacy.sol", "test/integration/*.sol"]
     fn test_parse_empty_config() {
         let config = FileConfig::from_toml("").unwrap();
         assert!(!config.is_file_ignored(Path::new("src/test.sol")));
-        assert!(config.get_ignored_rules(Path::new("src/test.sol")).is_empty());
+        assert_eq!(config.get_ignored_rules(Path::new("src/test.sol")), Vec::new());
     }
 }
