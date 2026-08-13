@@ -1,0 +1,21 @@
+{
+  "name": "scopelint",
+  "owner": {
+    "name": "ScopeLift"
+  },
+  "metadata": {
+    "description": "ScopeLint and ScopeLift skills for Foundry/Solidity: lint workflows and structure reviews.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "scopelint",
+      "source": "./plugins/scopelint",
+      "description": "ScopeLint lint workflow and ScopeLift review: run scopelint check, list findings by priority, fix or review with the 'why' behind conventions.",
+      "version": "1.0.0",
+      "author": { "name": "ScopeLift" },
+      "repository": "https://github.com/ScopeLift/scopelint",
+      "keywords": ["solidity", "foundry", "lint", "code-review", "scopelint"]
+    }
+  ]
+}

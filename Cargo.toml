@@ -2,6 +2,9 @@
   categories = ["development-tools"]
   description = "An opinionated formatting and linting tool for foundry projects"
   edition = "2021"
+  # Exclude plugin/marketplace dirs from package; when include is set they're already omitted.
+  # cargo test and clippy only run on Rust sources (src/, tests/) so they never see these dirs.
+  exclude = ["plugins", ".claude-plugin"]
   include = ["/src"]
   keywords = ["foundry", "linting", "formatting"]
   license = "MIT"
