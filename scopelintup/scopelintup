@@ -1,0 +1,363 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# scopelintup — version manager for scopelint
+# https://github.com/ScopeLift/scopelint
+
+SCOPELINT_DIR="${SCOPELINT_DIR:-$HOME/.scopelint}"
+SCOPELINT_BIN_DIR="$SCOPELINT_DIR/bin"
+SCOPELINT_VERSIONS_DIR="$SCOPELINT_DIR/versions"
+SCOPELINT_CURRENT_FILE="$SCOPELINT_DIR/.current_version"
+
+REPO="ScopeLift/scopelint"
+GITHUB_API="https://api.github.com"
+GITHUB_DOWNLOAD="https://github.com/$REPO/releases/download"
+GITHUB_RAW="https://raw.githubusercontent.com/$REPO/main/scopelintup/scopelintup"
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+say() { printf "scopelintup: %s\n" "$*"; }
+err() { say "error: $*" >&2; exit 1; }
+
+need_cmd() {
+  command -v "$1" > /dev/null 2>&1 || err "need '$1' (command not found)"
+}
+
+# Build curl flags, optionally adding a GitHub token for API calls.
+curl_args() {
+  local -a args=(-fsSL)
+  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    args+=(-H "Authorization: token $GITHUB_TOKEN")
+  fi
+  printf '%s\n' "${args[@]}"
+}
+
+# ---------------------------------------------------------------------------
+# Platform detection
+# ---------------------------------------------------------------------------
+
+detect_platform() {
+  local os arch
+
+  os="$(uname -s)"
+  arch="$(uname -m)"
+
+  case "$os" in
+    Linux)  os="linux" ;;
+    Darwin) os="macos" ;;
+    MINGW*|MSYS*|CYGWIN*) os="windows" ;;
+    *) err "unsupported OS: $os" ;;
+  esac
+
+  case "$arch" in
+    x86_64|amd64)  arch="x86_64" ;;
+    aarch64|arm64) arch="aarch64" ;;
+    *) err "unsupported architecture: $arch" ;;
+  esac
+
+  # Archive name matches the release workflow matrix.
+  PLATFORM="${arch}-${os}"
+  if [[ "$os" == "windows" ]]; then
+    ARCHIVE="scopelint-${PLATFORM}.zip"
+  else
+    ARCHIVE="scopelint-${PLATFORM}.tar.xz"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# GitHub helpers
+# ---------------------------------------------------------------------------
+
+# Fetch the latest release tag (e.g. v1.0.0).
+latest_tag() {
+  need_cmd curl
+  local tag
+  tag=$(curl $(curl_args) "$GITHUB_API/repos/$REPO/releases/latest" \
+    | grep '"tag_name"' | head -1 | sed 's/.*: *"\(.*\)".*/\1/')
+  [[ -n "$tag" ]] || err "could not determine latest release"
+  echo "$tag"
+}
+
+# List all release tags from GitHub.
+list_remote_tags() {
+  need_cmd curl
+  curl $(curl_args) "$GITHUB_API/repos/$REPO/releases" \
+    | grep '"tag_name"' | sed 's/.*: *"\(.*\)".*/\1/'
+}
+
+# ---------------------------------------------------------------------------
+# Version helpers
+# ---------------------------------------------------------------------------
+
+# Normalise tag: ensure it starts with 'v'.
+normalise_tag() {
+  local tag="$1"
+  [[ "$tag" == v* ]] || tag="v$tag"
+  echo "$tag"
+}
+
+current_version() {
+  if [[ -f "$SCOPELINT_CURRENT_FILE" ]]; then
+    cat "$SCOPELINT_CURRENT_FILE"
+  fi
+}
+
+set_current_version() {
+  echo "$1" > "$SCOPELINT_CURRENT_FILE"
+}
+
+# ---------------------------------------------------------------------------
+# Core actions
+# ---------------------------------------------------------------------------
+
+download_version() {
+  local tag="$1"
+  tag=$(normalise_tag "$tag")
+
+  local dest="$SCOPELINT_VERSIONS_DIR/$tag"
+  if [[ -d "$dest" ]]; then
+    say "version $tag is already installed"
+    set_current_version "$tag"
+    return
+  fi
+
+  detect_platform
+
+  say "downloading scopelint $tag ($PLATFORM)..."
+
+  local url="$GITHUB_DOWNLOAD/$tag/$ARCHIVE"
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  trap 'rm -rf "${tmpdir:-}"' EXIT
+
+  need_cmd curl
+  if ! curl $(curl_args) -o "$tmpdir/$ARCHIVE" "$url"; then
+    err "failed to download $url — does release $tag exist for $PLATFORM?"
+  fi
+
+  mkdir -p "$dest"
+
+  case "$ARCHIVE" in
+    *.tar.xz)
+      need_cmd tar
+      tar xJf "$tmpdir/$ARCHIVE" -C "$tmpdir"
+      mv "$tmpdir/scopelint-${PLATFORM}/scopelint" "$dest/scopelint"
+      ;;
+    *.zip)
+      need_cmd unzip
+      unzip -q "$tmpdir/$ARCHIVE" -d "$tmpdir"
+      mv "$tmpdir/scopelint-${PLATFORM}/scopelint.exe" "$dest/scopelint.exe"
+      ;;
+  esac
+
+  chmod +x "$dest/scopelint"* 2>/dev/null || true
+  set_current_version "$tag"
+  say "installed scopelint $tag"
+}
+
+write_shim() {
+  mkdir -p "$SCOPELINT_BIN_DIR"
+  cat > "$SCOPELINT_BIN_DIR/scopelint" <<'SHIM'
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCOPELINT_DIR="${SCOPELINT_DIR:-$HOME/.scopelint}"
+
+# 1. Walk up looking for .scopelint-version
+resolve_from_file() {
+  local dir="$PWD"
+  while [[ "$dir" != "/" ]]; do
+    if [[ -f "$dir/.scopelint-version" ]]; then
+      cat "$dir/.scopelint-version"
+      return
+    fi
+    dir="$(dirname "$dir")"
+  done
+}
+
+version=$(resolve_from_file)
+
+# 2. Environment variable
+if [[ -z "${version:-}" ]]; then
+  version="${SCOPELINT_VERSION:-}"
+fi
+
+# 3. Global default
+if [[ -z "${version:-}" && -f "$SCOPELINT_DIR/.current_version" ]]; then
+  version=$(cat "$SCOPELINT_DIR/.current_version")
+fi
+
+if [[ -z "${version:-}" ]]; then
+  echo "scopelint: no version configured." >&2
+  echo "  Run 'scopelintup' to install the latest version," >&2
+  echo "  or create a .scopelint-version file." >&2
+  exit 1
+fi
+
+# Normalise: ensure 'v' prefix.
+[[ "$version" == v* ]] || version="v$version"
+
+binary="$SCOPELINT_DIR/versions/$version/scopelint"
+if [[ ! -x "$binary" ]]; then
+  echo "scopelint: version $version is not installed." >&2
+  echo "  Run 'scopelintup --version $version' to install it." >&2
+  exit 1
+fi
+
+exec "$binary" "$@"
+SHIM
+  chmod +x "$SCOPELINT_BIN_DIR/scopelint"
+}
+
+install_latest() {
+  local tag
+  tag=$(latest_tag)
+  download_version "$tag"
+  write_shim
+  say "default version set to $tag"
+}
+
+install_version() {
+  local tag
+  tag=$(normalise_tag "$1")
+  download_version "$tag"
+  write_shim
+  say "default version set to $tag"
+}
+
+use_version() {
+  local tag
+  tag=$(normalise_tag "$1")
+  if [[ ! -d "$SCOPELINT_VERSIONS_DIR/$tag" ]]; then
+    err "version $tag is not installed — run 'scopelintup --version $tag' first"
+  fi
+  set_current_version "$tag"
+  say "global default set to $tag"
+}
+
+pin_version() {
+  local tag
+  tag=$(normalise_tag "$1")
+  echo "$tag" > .scopelint-version
+  say "wrote .scopelint-version ($tag)"
+}
+
+list_installed() {
+  local current
+  current=$(current_version)
+
+  if [[ ! -d "$SCOPELINT_VERSIONS_DIR" ]] || [[ -z "$(ls -A "$SCOPELINT_VERSIONS_DIR" 2>/dev/null)" ]]; then
+    say "no versions installed"
+    return
+  fi
+
+  for dir in "$SCOPELINT_VERSIONS_DIR"/*/; do
+    local ver
+    ver=$(basename "$dir")
+    if [[ "$ver" == "$current" ]]; then
+      echo "  $ver *"
+    else
+      echo "  $ver"
+    fi
+  done
+}
+
+list_remote() {
+  say "available releases:"
+  list_remote_tags | while read -r tag; do
+    echo "  $tag"
+  done
+}
+
+self_update() {
+  say "updating scopelintup..."
+  need_cmd curl
+  local dest="$SCOPELINT_DIR/scopelintup"
+  curl $(curl_args) -o "$dest" "$GITHUB_RAW"
+  chmod +x "$dest"
+
+  # Refresh symlink in bin dir.
+  ln -sf "$dest" "$SCOPELINT_BIN_DIR/scopelintup"
+  say "scopelintup updated"
+}
+
+usage() {
+  cat <<EOF
+scopelintup — version manager for scopelint
+
+USAGE:
+    scopelintup [OPTIONS]
+
+OPTIONS:
+    (none)                  Install or update to the latest release
+    --version <tag>         Install a specific version (e.g. v0.1.0)
+    --list                  List installed versions
+    --list-remote           List available versions from GitHub
+    --use <tag>             Set the global default version
+    --pin <tag>             Write .scopelint-version in the current directory
+    --self-update           Update scopelintup itself
+    -h, --help              Show this help message
+
+ENVIRONMENT:
+    SCOPELINT_VERSION       Override version (used by the shim)
+    SCOPELINT_DIR           Override base directory (default: ~/.scopelint)
+    GITHUB_TOKEN            GitHub token to avoid API rate limits
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+main() {
+  # Ensure directories exist.
+  mkdir -p "$SCOPELINT_BIN_DIR" "$SCOPELINT_VERSIONS_DIR"
+
+  if [[ $# -eq 0 ]]; then
+    install_latest
+    exit 0
+  fi
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --version)
+        [[ -n "${2:-}" ]] || err "--version requires a tag argument"
+        install_version "$2"
+        shift 2
+        ;;
+      --list)
+        list_installed
+        shift
+        ;;
+      --list-remote)
+        list_remote
+        shift
+        ;;
+      --use)
+        [[ -n "${2:-}" ]] || err "--use requires a tag argument"
+        use_version "$2"
+        shift 2
+        ;;
+      --pin)
+        [[ -n "${2:-}" ]] || err "--pin requires a tag argument"
+        pin_version "$2"
+        shift 2
+        ;;
+      --self-update)
+        self_update
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        err "unknown option: $1 (see --help)"
+        ;;
+    esac
+  done
+}
+
+main "$@"
