@@ -171,6 +171,8 @@ pub struct Parsed {
     pub file_config: file_config::FileConfig,
     /// Path configuration from foundry.toml (src/script/test dirs).
     pub path_config: CheckPaths,
+    /// Byte offsets of `transient` keywords blanked during preprocessing.
+    pub transient_offsets: Vec<usize>,
 }
 
 /// Parses the source code and returns a [`Parsed`] struct.
@@ -181,10 +183,11 @@ pub struct Parsed {
 pub fn parse(file: &Path) -> Result<Parsed, Box<dyn Error>> {
     let src = &fs::read_to_string(file)?;
 
-    let (pt, comments) = crate::parser::parse_solidity(src, 0).map_err(|d| {
-        eprintln!("{d:?}");
-        "Failed to parse file".to_string()
-    })?;
+    let (pt, comments, transient_offsets) =
+        crate::parser::parse_solidity(src, 0).map_err(|d| {
+            eprintln!("{d:?}");
+            "Failed to parse file".to_string()
+        })?;
 
     let comments = Comments::new(comments, src);
     let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
@@ -203,6 +206,7 @@ pub fn parse(file: &Path) -> Result<Parsed, Box<dyn Error>> {
         invalid_inline_config_items,
         file_config,
         path_config,
+        transient_offsets,
     })
 }
 

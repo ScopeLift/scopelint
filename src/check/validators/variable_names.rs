@@ -91,7 +91,7 @@ fn validate_function(parsed: &Parsed, f: &FunctionDefinition) -> Vec<InvalidItem
 fn validate_state_variable(parsed: &Parsed, v: &VariableDefinition) -> Option<InvalidItem> {
     v.name.as_ref().and_then(|name| {
         let name_str = &name.name;
-        let is_transient = is_transient_state_variable(&parsed.src, name.loc);
+        let is_transient = is_transient_state_variable(parsed, name.loc);
 
         if is_transient {
             if name_str.starts_with("t_") {
@@ -197,188 +197,25 @@ fn is_valid_state_variable_name(name: &str) -> bool {
     !name.starts_with('_')
 }
 
-/// Detects whether a state variable declaration uses the `transient` keyword by scanning the
-/// original source before the variable name.
-fn is_transient_state_variable(src: &str, name_loc: solang_parser::pt::Loc) -> bool {
-    let start = name_loc.start();
-    if start > src.len() {
+/// Detects whether a state variable declaration uses the `transient` keyword by checking the
+/// offsets recorded during preprocessing against the declaration range before the variable name.
+fn is_transient_state_variable(parsed: &Parsed, name_loc: solang_parser::pt::Loc) -> bool {
+    if parsed.transient_offsets.is_empty() {
         return false;
     }
-
-    let decl_start = declaration_start_before_name(src, start);
-    contains_keyword_before_name(src, decl_start, start, "transient")
+    let name_start = name_loc.start();
+    let decl_start = declaration_start_before_name(&parsed.src, name_start);
+    parsed.transient_offsets.iter().any(|&off| off >= decl_start && off < name_start)
 }
 
-#[derive(Clone, Copy, Eq, PartialEq)]
-enum ScanState {
-    Code,
-    LineComment,
-    BlockComment,
-    SingleQuote,
-    DoubleQuote,
-}
-
-fn declaration_start_before_name(src: &str, end: usize) -> usize {
+fn declaration_start_before_name(src: &str, before: usize) -> usize {
     let bytes = src.as_bytes();
-    let mut idx = 0;
-    let mut last_boundary = 0;
-    let mut state = ScanState::Code;
-
-    while idx < end {
-        match state {
-            ScanState::Code => match bytes[idx] {
-                b'/' if idx + 1 < end && bytes[idx + 1] == b'/' => {
-                    state = ScanState::LineComment;
-                    idx += 2;
-                }
-                b'/' if idx + 1 < end && bytes[idx + 1] == b'*' => {
-                    state = ScanState::BlockComment;
-                    idx += 2;
-                }
-                b'\'' => {
-                    state = ScanState::SingleQuote;
-                    idx += 1;
-                }
-                b'"' => {
-                    state = ScanState::DoubleQuote;
-                    idx += 1;
-                }
-                b';' | b'{' | b'}' => {
-                    last_boundary = idx + 1;
-                    idx += 1;
-                }
-                _ => idx += 1,
-            },
-            ScanState::LineComment => {
-                if bytes[idx] == b'\n' {
-                    state = ScanState::Code;
-                }
-                idx += 1;
-            }
-            ScanState::BlockComment => {
-                if bytes[idx] == b'*' && idx + 1 < end && bytes[idx + 1] == b'/' {
-                    state = ScanState::Code;
-                    idx += 2;
-                } else {
-                    idx += 1;
-                }
-            }
-            ScanState::SingleQuote => {
-                if bytes[idx] == b'\\' {
-                    idx = (idx + 2).min(end);
-                } else {
-                    if bytes[idx] == b'\'' {
-                        state = ScanState::Code;
-                    }
-                    idx += 1;
-                }
-            }
-            ScanState::DoubleQuote => {
-                if bytes[idx] == b'\\' {
-                    idx = (idx + 2).min(end);
-                } else {
-                    if bytes[idx] == b'"' {
-                        state = ScanState::Code;
-                    }
-                    idx += 1;
-                }
-            }
+    for i in (0..before).rev() {
+        if matches!(bytes[i], b';' | b'{' | b'}') {
+            return i + 1;
         }
     }
-
-    last_boundary
-}
-
-fn contains_keyword_before_name(src: &str, start: usize, end: usize, keyword: &str) -> bool {
-    let bytes = src.as_bytes();
-    let keyword = keyword.as_bytes();
-    let mut idx = start;
-    let mut state = ScanState::Code;
-
-    while idx < end {
-        match state {
-            ScanState::Code => {
-                if idx + keyword.len() <= end &&
-                    &bytes[idx..idx + keyword.len()] == keyword &&
-                    is_keyword_boundary(bytes, start, idx, idx + keyword.len(), end)
-                {
-                    return true;
-                }
-
-                match bytes[idx] {
-                    b'/' if idx + 1 < end && bytes[idx + 1] == b'/' => {
-                        state = ScanState::LineComment;
-                        idx += 2;
-                    }
-                    b'/' if idx + 1 < end && bytes[idx + 1] == b'*' => {
-                        state = ScanState::BlockComment;
-                        idx += 2;
-                    }
-                    b'\'' => {
-                        state = ScanState::SingleQuote;
-                        idx += 1;
-                    }
-                    b'"' => {
-                        state = ScanState::DoubleQuote;
-                        idx += 1;
-                    }
-                    _ => idx += 1,
-                }
-            }
-            ScanState::LineComment => {
-                if bytes[idx] == b'\n' {
-                    state = ScanState::Code;
-                }
-                idx += 1;
-            }
-            ScanState::BlockComment => {
-                if bytes[idx] == b'*' && idx + 1 < end && bytes[idx + 1] == b'/' {
-                    state = ScanState::Code;
-                    idx += 2;
-                } else {
-                    idx += 1;
-                }
-            }
-            ScanState::SingleQuote => {
-                if bytes[idx] == b'\\' {
-                    idx = (idx + 2).min(end);
-                } else {
-                    if bytes[idx] == b'\'' {
-                        state = ScanState::Code;
-                    }
-                    idx += 1;
-                }
-            }
-            ScanState::DoubleQuote => {
-                if bytes[idx] == b'\\' {
-                    idx = (idx + 2).min(end);
-                } else {
-                    if bytes[idx] == b'"' {
-                        state = ScanState::Code;
-                    }
-                    idx += 1;
-                }
-            }
-        }
-    }
-
-    false
-}
-
-const fn is_keyword_boundary(
-    bytes: &[u8],
-    search_start: usize,
-    keyword_start: usize,
-    keyword_end: usize,
-    search_end: usize,
-) -> bool {
-    let before = keyword_start == search_start || !is_identifier_char(bytes[keyword_start - 1]);
-    let after = keyword_end == search_end || !is_identifier_char(bytes[keyword_end]);
-    before && after
-}
-
-const fn is_identifier_char(byte: u8) -> bool {
-    byte.is_ascii_alphanumeric() || byte == b'_'
+    0
 }
 
 fn is_valid_local_variable_name(name: &str, is_storage: bool) -> bool {

@@ -269,6 +269,7 @@ impl ExpectedFindings {
             comments: Comments,
             inline_config: InlineConfig,
             invalid_inline_config_items: Vec<(solang_parser::pt::Loc, InvalidInlineConfigItem)>,
+            transient_offsets: Vec<usize>,
         ) -> Parsed {
             Parsed {
                 file: PathBuf::from(path_name),
@@ -279,10 +280,12 @@ impl ExpectedFindings {
                 invalid_inline_config_items,
                 file_config: crate::check::file_config::FileConfig::default(),
                 path_config: CheckPaths::default(),
+                transient_offsets,
             }
         }
         // Parse content.
-        let (pt, comments) = crate::parser::parse_solidity(src, 0).expect("Parsing failed");
+        let (pt, comments, transient_offsets) =
+            crate::parser::parse_solidity(src, 0).expect("Parsing failed");
         let comments = Comments::new(comments, src);
 
         // Create `Parsed` struct for each file path to test. We can clone `pt` and `comments`, but
@@ -297,6 +300,7 @@ impl ExpectedFindings {
             comments.clone(),
             inline_config,
             invalid_inline_config_items,
+            transient_offsets.clone(),
         ));
 
         let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
@@ -309,6 +313,7 @@ impl ExpectedFindings {
             comments.clone(),
             inline_config,
             invalid_inline_config_items,
+            transient_offsets.clone(),
         ));
 
         let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
@@ -321,6 +326,7 @@ impl ExpectedFindings {
             comments.clone(),
             inline_config,
             invalid_inline_config_items,
+            transient_offsets.clone(),
         ));
 
         let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
@@ -333,6 +339,7 @@ impl ExpectedFindings {
             comments.clone(),
             inline_config,
             invalid_inline_config_items,
+            transient_offsets.clone(),
         ));
 
         let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
@@ -345,6 +352,7 @@ impl ExpectedFindings {
             comments.clone(),
             inline_config,
             invalid_inline_config_items,
+            transient_offsets.clone(),
         ));
 
         let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
@@ -357,6 +365,7 @@ impl ExpectedFindings {
             comments,
             inline_config,
             invalid_inline_config_items,
+            transient_offsets,
         ));
 
         //  Execute tests.
