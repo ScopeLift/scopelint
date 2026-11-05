@@ -418,4 +418,48 @@ contract MyContract {
         let fixed = fix_source(&parsed, None);
         assert!(fixed.is_none());
     }
+
+    #[test]
+    fn test_forge_lint_disable_next_line_suppresses_unused_import() {
+        let content = r#"// forge-lint: disable-next-line(unused-import)
+import {console} from "forge-std/console.sol";
+
+contract MyContract {
+}
+"#;
+        let parsed = parsed_from_src(content);
+        let items = validate(&parsed);
+        assert_eq!(items.len(), 1, "finding should still be emitted");
+        assert!(items[0].is_ignored, "finding should be marked ignored via forge-lint directive");
+    }
+
+    #[test]
+    fn test_forge_lint_disable_block_suppresses_unused_import() {
+        let content = r#"// forge-lint: disable-start(unused-import)
+import {console} from "forge-std/console.sol";
+// forge-lint: disable-end(unused-import)
+
+contract MyContract {
+}
+"#;
+        let parsed = parsed_from_src(content);
+        let items = validate(&parsed);
+        assert_eq!(items.len(), 1, "finding should still be emitted");
+        assert!(items[0].is_ignored, "finding should be marked ignored via forge-lint block");
+    }
+
+    #[test]
+    fn test_forge_lint_does_not_suppress_outside_range() {
+        let content = r#"// forge-lint: disable-start(unused-import)
+// forge-lint: disable-end(unused-import)
+import {console} from "forge-std/console.sol";
+
+contract MyContract {
+}
+"#;
+        let parsed = parsed_from_src(content);
+        let items = validate(&parsed);
+        assert_eq!(items.len(), 1);
+        assert!(!items[0].is_ignored, "finding outside range should NOT be ignored");
+    }
 }

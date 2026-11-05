@@ -108,6 +108,32 @@ impl FromStr for InlineConfigItem {
     }
 }
 
+impl InlineConfigItem {
+    /// Parse a forge-lint directive (e.g. `disable-next-line(unused-import)`) and map it to
+    /// the equivalent scopelint ignore item.  Returns `None` for directives that have no
+    /// scopelint equivalent (unknown rules or unrecognised syntax).
+    pub fn from_forge_lint(s: &str) -> Option<Self> {
+        let (action, rule) = s.split_once('(')?;
+        let rule = rule.strip_suffix(')')?.trim();
+        let kind = parse_forge_lint_rule(rule)?;
+        let scope = match action.trim() {
+            "disable-next-line" => RuleIgnoreScope::NextLine,
+            "disable-start" => RuleIgnoreScope::Start,
+            "disable-end" => RuleIgnoreScope::End,
+            _ => return None,
+        };
+        Some(InlineConfigItem::IgnoreRule { kind, scope })
+    }
+}
+
+/// Maps a forge-lint rule name to a scopelint `ValidatorKind`.
+fn parse_forge_lint_rule(rule: &str) -> Option<ValidatorKind> {
+    match rule {
+        "unused-import" => Some(ValidatorKind::Import),
+        _ => None,
+    }
+}
+
 /// The scope of a rule-specific ignore directive
 #[derive(Debug, Clone, Copy)]
 pub enum RuleIgnoreScope {
@@ -497,5 +523,61 @@ impl InlineConfig {
         self.rule_ignored_ranges
             .get(kind)
             .map_or(false, |ranges| ranges.iter().any(|range| range.includes(loc)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn forge_lint_disable_next_line_unused_import() {
+        let item = InlineConfigItem::from_forge_lint("disable-next-line(unused-import)");
+        assert!(item.is_some());
+        assert!(matches!(
+            item.unwrap(),
+            InlineConfigItem::IgnoreRule {
+                kind: ValidatorKind::Import,
+                scope: RuleIgnoreScope::NextLine,
+            }
+        ));
+    }
+
+    #[test]
+    fn forge_lint_disable_start_end_unused_import() {
+        let start = InlineConfigItem::from_forge_lint("disable-start(unused-import)");
+        assert!(matches!(
+            start.unwrap(),
+            InlineConfigItem::IgnoreRule {
+                kind: ValidatorKind::Import,
+                scope: RuleIgnoreScope::Start,
+            }
+        ));
+
+        let end = InlineConfigItem::from_forge_lint("disable-end(unused-import)");
+        assert!(matches!(
+            end.unwrap(),
+            InlineConfigItem::IgnoreRule {
+                kind: ValidatorKind::Import,
+                scope: RuleIgnoreScope::End,
+            }
+        ));
+    }
+
+    #[test]
+    fn forge_lint_unknown_rule_returns_none() {
+        assert!(InlineConfigItem::from_forge_lint("disable-next-line(unknown-rule)").is_none());
+    }
+
+    #[test]
+    fn forge_lint_unknown_action_returns_none() {
+        assert!(InlineConfigItem::from_forge_lint("enable(unused-import)").is_none());
+    }
+
+    #[test]
+    fn forge_lint_malformed_returns_none() {
+        assert!(InlineConfigItem::from_forge_lint("disable-next-line").is_none());
+        assert!(InlineConfigItem::from_forge_lint("").is_none());
+        assert!(InlineConfigItem::from_forge_lint("(unused-import)").is_none());
     }
 }
