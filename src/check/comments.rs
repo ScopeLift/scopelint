@@ -240,19 +240,27 @@ impl Comments {
     }
 
     /// Parse all comments to return a list of inline config items. This will return an iterator of
-    /// results of parsing comments which start with `scopelint:`
+    /// results of parsing comments which start with `scopelint:` or `forge-lint:`.
+    ///
+    /// Forge-lint directives (`forge-lint: disable-next-line(rule)`, `disable-start(rule)`,
+    /// `disable-end(rule)`) are mapped to the equivalent scopelint ignore directives so that a
+    /// single set of comments suppresses both tools.
     pub fn parse_inline_config_items(
         &self,
     ) -> impl Iterator<Item = Result<(Loc, InlineConfigItem), (Loc, InvalidInlineConfigItem)>> + '_
     {
-        self.iter()
-            .filter_map(|comment| {
-                Some((comment, comment.contents().trim_start().strip_prefix("scopelint:")?.trim()))
-            })
-            .map(|(comment, item)| {
-                let loc = comment.loc;
-                item.parse().map(|out| (loc, out)).map_err(|out| (loc, out))
-            })
+        self.iter().filter_map(|comment| {
+            let contents = comment.contents().trim_start();
+            if let Some(item) = contents.strip_prefix("scopelint:") {
+                let item = item.trim();
+                Some(item.parse().map(|out| (comment.loc, out)).map_err(|out| (comment.loc, out)))
+            } else if let Some(item) = contents.strip_prefix("forge-lint:") {
+                let item = item.trim();
+                InlineConfigItem::from_forge_lint(item).map(|out| Ok((comment.loc, out)))
+            } else {
+                None
+            }
+        })
     }
 }
 
