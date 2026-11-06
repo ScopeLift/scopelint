@@ -357,7 +357,8 @@ mod tests {
         use crate::check::{comments::Comments, inline_config::InlineConfig};
         use std::path::PathBuf;
 
-        let (pt, comments) = crate::parser::parse_solidity(content, 0).expect("parse");
+        let (pt, comments, transient_offsets) =
+            crate::parser::parse_solidity(content, 0).expect("parse");
         let comments = Comments::new(comments, content);
         let (inline_config_items, invalid_inline_config_items): (Vec<_>, Vec<_>) =
             comments.parse_inline_config_items().partition_result();
@@ -371,6 +372,7 @@ mod tests {
             invalid_inline_config_items,
             file_config: crate::check::file_config::FileConfig::default(),
             path_config: crate::foundry_config::CheckPaths::default(),
+            transient_offsets,
         }
     }
 
